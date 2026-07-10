@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#111827">
-<title>Cormach Maps</title>
+<title>Maps APP</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -12,14 +12,14 @@
 </head>
 <body>
 <header>
-  <div><strong>Cormach Maps</strong><span>CRM geografica locale</span></div>
+  <div><strong>Maps APP</strong><span>Mappa interattiva da Excel</span></div>
   <button id="installBtn" class="ghost" hidden>Installa</button>
 </header>
 <main>
   <aside>
     <section class="panel hero">
-      <h1>I clienti, sulla mappa.</h1>
-      <p>Importa anagrafiche, ordini e vendite. I dati restano nel browser.</p>
+      <h1>I tuoi dati, sulla mappa.</h1>
+      <p>Importa clienti, ordini e vendite. Salva e aggiorna tutto localmente.</p>
       <label class="button primary">Importa Excel<input id="excelInput" type="file" accept=".xlsx,.xls" multiple hidden></label>
       <div class="row">
         <button id="exportBtn">Esporta progetto</button>
@@ -73,7 +73,7 @@
     <div id="detail"></div>
   </form>
 </dialog>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="vendor/jszip.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="app.js"></script>
 </body>
