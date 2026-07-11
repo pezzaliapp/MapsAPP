@@ -35,3 +35,7 @@ I file Excel e il progetto restano nel browser. Le tessere della mappa e la geoc
 
 ## Correzione v2
 Il lettore Excel è incluso localmente. I file allegati clienti, ordini e vendite vengono riconosciuti dalla struttura delle colonne, senza dipendere dal nome del file.
+
+
+## iPhone / iPad
+Questa versione usa una lettura Excel compatibile con Safari iOS. Dopo l'importazione dei clienti è necessario geocodificare gli indirizzi, perché l'Excel non contiene latitudine e longitudine.

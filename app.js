@@ -1,4 +1,4 @@
-const DB_KEY='maps-app-project-v2';
+const DB_KEY='maps-app-project-v3';
 let project={version:2,updatedAt:null,clients:{},imports:{}};
 let map=null,markers=null,deferredPrompt,currentId=null;
 const $=s=>document.querySelector(s);
@@ -9,13 +9,61 @@ const excelDate=v=>{if(!v)return'';if(typeof v==='number'||/^\d+(\.\d+)?$/.test(
 function save(){project.updatedAt=new Date().toISOString();localStorage.setItem(DB_KEY,JSON.stringify(project));render()}
 function load(){try{const p=JSON.parse(localStorage.getItem(DB_KEY));if(p?.clients){project=p;for(const c of Object.values(project.clients)){c.orderLines??=[];c.saleLines??=[];c.saleYears??={}}}}catch(e){console.warn(e)}}
 function initMap(){if(typeof L==='undefined'){document.getElementById('map').innerHTML='<div style="padding:24px;text-align:center"><b>Mappa non disponibile.</b><br><small>Serve una connessione Internet per caricare la cartografia. L’importazione Excel funziona comunque.</small></div>';return}map=L.map('map').setView([42.5,12.5],6);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);markers=L.layerGroup().addTo(map)}
-function xmlText(node){return [...node.getElementsByTagNameNS('*','t')].map(x=>x.textContent||'').join('')}
+function xmlText(node){return Array.from(node.getElementsByTagNameNS('*','t')).map(x=>x.textContent||'').join('')}
 function colIndex(ref){const m=String(ref).match(/[A-Z]+/);if(!m)return 0;let n=0;for(const ch of m[0])n=n*26+ch.charCodeAt(0)-64;return n-1}
-async function readXlsx(file){if(typeof JSZip==='undefined')throw new Error('Lettore Excel non disponibile');const zip=await JSZip.loadAsync(await file.arrayBuffer());const parser=new DOMParser();let shared=[];const ss=zip.file('xl/sharedStrings.xml');if(ss){const doc=parser.parseFromString(await ss.async('string'),'application/xml');shared=[...doc.getElementsByTagNameNS('*','si')].map(xmlText)}const wbDoc=parser.parseFromString(await zip.file('xl/workbook.xml').async('string'),'application/xml');const relDoc=parser.parseFromString(await zip.file('xl/_rels/workbook.xml.rels').async('string'),'application/xml');const rels={};for(const r of relDoc.getElementsByTagNameNS('*','Relationship'))rels[r.getAttribute('Id')]=r.getAttribute('Target');const sheets=[];for(const s of wbDoc.getElementsByTagNameNS('*','sheet')){const rid=s.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id')||s.getAttribute('r:id');let target=rels[rid];if(!target)continue;target=target.replace(/^\//,'');if(!target.startsWith('xl/'))target='xl/'+target.replace(/^\.\.\//,'');sheets.push({name:s.getAttribute('name'),target})}const all=[];for(const sh of sheets){const f=zip.file(sh.target);if(!f)continue;const doc=parser.parseFromString(await f.async('string'),'application/xml');const matrix=[];for(const row of doc.getElementsByTagNameNS('*','row')){const arr=[];for(const c of row.getElementsByTagNameNS('*','c')){const idx=colIndex(c.getAttribute('r'));const t=c.getAttribute('t');let v='';const vn=c.getElementsByTagNameNS('*','v')[0];if(t==='inlineStr')v=xmlText(c);else if(vn){v=vn.textContent||'';if(t==='s')v=shared[Number(v)]??'';else if(t==='b')v=v==='1';else if(v!==''&&!isNaN(v))v=Number(v)}arr[idx]=v}matrix.push(arr)}if(matrix.length)all.push({name:sh.name,rows:matrix})}return all}
+function fileToArrayBuffer(file){if(file.arrayBuffer)return file.arrayBuffer();return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error||new Error('Impossibile leggere il file'));r.readAsArrayBuffer(file)})}
+async function readXlsx(file){if(typeof JSZip==='undefined')throw new Error('Lettore Excel non disponibile');const buffer=await fileToArrayBuffer(file);const zip=await JSZip.loadAsync(buffer);const parser=new DOMParser();let shared=[];const ss=zip.file('xl/sharedStrings.xml');if(ss){const doc=parser.parseFromString(await ss.async('string'),'application/xml');shared=Array.from(doc.getElementsByTagNameNS('*','si')).map(xmlText)}const wbDoc=parser.parseFromString(await zip.file('xl/workbook.xml').async('string'),'application/xml');const relDoc=parser.parseFromString(await zip.file('xl/_rels/workbook.xml.rels').async('string'),'application/xml');const rels={};for(const r of relDoc.getElementsByTagNameNS('*','Relationship'))rels[r.getAttribute('Id')]=r.getAttribute('Target');const sheets=[];for(const s of wbDoc.getElementsByTagNameNS('*','sheet')){const rid=s.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id')||s.getAttribute('r:id');let target=rels[rid];if(!target)continue;target=target.replace(/^\//,'');if(!target.startsWith('xl/'))target='xl/'+target.replace(/^\.\.\//,'');sheets.push({name:s.getAttribute('name'),target})}const all=[];for(const sh of sheets){const f=zip.file(sh.target);if(!f)continue;const doc=parser.parseFromString(await f.async('string'),'application/xml');const matrix=[];for(const row of doc.getElementsByTagNameNS('*','row')){const arr=[];for(const c of row.getElementsByTagNameNS('*','c')){const idx=colIndex(c.getAttribute('r'));const t=c.getAttribute('t');let v='';const vn=c.getElementsByTagNameNS('*','v')[0];if(t==='inlineStr')v=xmlText(c);else if(vn){v=vn.textContent||'';if(t==='s')v=shared[Number(v)]??'';else if(t==='b')v=v==='1';else if(v!==''&&!isNaN(v))v=Number(v)}arr[idx]=v}matrix.push(arr)}if(matrix.length)all.push({name:sh.name,rows:matrix})}return all}
 function uniqueHeaders(raw){const used={};return raw.map((x,i)=>{let h=norm(x)||`COL_${i+1}`;used[h]=(used[h]||0)+1;return used[h]===1?h:`${h}_${used[h]-1}`})}
 function matrixToObjects(matrix){if(!matrix.length)return[];const headers=uniqueHeaders(matrix[0]);return matrix.slice(1).filter(r=>r.some(v=>norm(v)!=='')).map(r=>Object.fromEntries(headers.map((h,i)=>[h,r[i]??''])))}
 function findType(headers){const h=headers.map(x=>x.toUpperCase());if(h.includes('RAGIONE SOCIALE 1')&&h.includes('INDIRIZZO')&&h.includes('CITTA'))return'clienti';if(h.includes('IMPORTO INEVASO'))return'ordini';if(h.includes('IMPORTO CONSEGNATO'))return'vendite';return null}
-async function importFiles(files){if(!files.length)return;const status=$('#status');let imported=0,errors=[];status.textContent='Lettura Excel in corso…';for(const file of files){try{const sheets=await readXlsx(file);let recognized=false;for(const sh of sheets){const rows=matrixToObjects(sh.rows);if(!rows.length)continue;const type=findType(Object.keys(rows[0]));if(!type)continue;recognized=true;if(type==='clienti')importClients(rows);if(type==='ordini')importOrders(rows);if(type==='vendite')importSales(rows);project.imports[type]={file:file.name,rows:rows.length,date:new Date().toISOString()};imported++}if(!recognized)errors.push(`${file.name}: struttura non riconosciuta`)}catch(e){console.error(e);errors.push(`${file.name}: ${e.message||'errore di lettura'}`)}}save();status.textContent=statusText();if(errors.length)alert(`Importazione completata con avvisi:\n\n${errors.join('\n')}`);else alert(`Importazione completata. File riconosciuti: ${imported}.`);$('#excelInput').value=''}
+async function importFiles(files){
+  if(!files.length)return;
+  const status=$('#status');
+  let imported=0,errors=[];
+  status.textContent='Lettura Excel in corso…';
+  await new Promise(r=>setTimeout(r,80));
+  for(const file of files){
+    try{
+      status.textContent=`Lettura di ${file.name}…`;
+      await new Promise(r=>setTimeout(r,30));
+      const sheets=await readXlsx(file);
+      let recognized=false;
+      for(const sh of sheets){
+        const rows=matrixToObjects(sh.rows);
+        if(!rows.length)continue;
+        const type=findType(Object.keys(rows[0]));
+        if(!type)continue;
+        recognized=true;
+        if(type==='clienti')importClients(rows);
+        if(type==='ordini')importOrders(rows);
+        if(type==='vendite')importSales(rows);
+        project.imports[type]={file:file.name,rows:rows.length,date:new Date().toISOString()};
+        imported++;
+      }
+      if(!recognized)errors.push(`${file.name}: struttura non riconosciuta`);
+    }catch(e){
+      console.error(e);
+      errors.push(`${file.name}: ${e.message||'errore di lettura'}`);
+    }
+  }
+  try{
+    project.updatedAt=new Date().toISOString();
+    localStorage.setItem(DB_KEY,JSON.stringify(project));
+  }catch(e){
+    console.error(e);
+    errors.push('Salvataggio locale non riuscito su questo dispositivo');
+  }
+  try{render()}catch(e){console.error(e);errors.push(`Visualizzazione: ${e.message||'errore'}`)}
+  const clients=Object.keys(project.clients).length;
+  const mapped=Object.values(project.clients).filter(c=>c.lat!=null&&c.lng!=null).length;
+  status.textContent=`${clients} clienti caricati · ${mapped} mappati`;
+  let msg=`Importazione terminata. File riconosciuti: ${imported}. Clienti caricati: ${clients}.`;
+  if(clients>0&&mapped===0)msg+='\n\nIl file clienti non contiene coordinate geografiche. Per vedere i marker usa “Geocodifica mancanti”.';
+  if(errors.length)msg+=`\n\nAvvisi:\n${errors.join('\n')}`;
+  alert(msg);
+  $('#excelInput').value='';
+}
+
 function ensure(id,name=''){id=norm(id).padStart(5,'0');if(!id||id==='00000')return null;return project.clients[id]??={id,name,emails:[],phones:[],orders:0,sales:0,orderLines:[],saleLines:[],saleYears:{},note:'',lat:null,lng:null,manualPosition:false}}
 function importClients(rows){const seen=new Set();for(const r of rows){const id=norm(r['CLIENTE']).padStart(5,'0');if(!id||id==='00000')continue;const c=ensure(id,norm(r['RAGIONE SOCIALE 1']));c.name=norm(r['RAGIONE SOCIALE 1'])||c.name;c.address=norm(r['INDIRIZZO']);c.city=norm(r['CITTA']);c.cap=norm(r['CAP']).padStart(5,'0');c.province=norm(r['PROVINCIA']);c.agentCode=norm(r['AGENTE']);c.agent=norm(r['DESCRIZIONE ELEMENTO_2']||r['DESCRIZIONE ELEMENTO_1']||r['DESCRIZIONE ELEMENTO']);c.abc=norm(r['CLASSE ABC']);c.payment=norm(r['DESCRIZIONE ELEMENTO']);[r['NR.TELEFONICO'],r['NR.CELLULARE']].map(norm).filter(Boolean).forEach(x=>{if(!c.phones.includes(x))c.phones.push(x)});const em=norm(r['EMAIL']);if(em&&!c.emails.includes(em))c.emails.push(em);seen.add(id)}project.imports.clientiCount=seen.size}
 function importOrders(rows){for(const c of Object.values(project.clients)){c.orders=0;c.orderLines=[]}for(const r of rows){const c=ensure(r['CLIENTE'],r['CLIENTE_1']);if(!c)continue;const amount=num(r['IMPORTO INEVASO']);c.name=c.name||norm(r['CLIENTE_1']);c.orders+=amount;c.orderLines.push({order:norm(r['NUM.']),date:excelDate(r['DATA CREAZIONE']),delivery:excelDate(r['DATA CONSEGNA']),year:norm(r['ANNO']),article:norm(r['ARTICOLO']),description:norm(r['DESCRIZIONE']),qty:num(r['QTA INEVASA']),amount})}}
