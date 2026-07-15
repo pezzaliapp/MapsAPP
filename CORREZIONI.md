@@ -47,3 +47,27 @@
 ## sw.js
 Versione cache aggiornata a `maps-app-v5-import-fix`: senza questo, il service worker
 avrebbe continuato a servire il vecchio app.js dalla cache anche dopo il deploy.
+
+## v6 — Correzioni PWA (pulsante Installa)
+
+**Causa principale: `icons/icon.svg` era un file da 1 byte (vuoto/corrotto).**
+Chrome verifica i criteri di installabilità (manifest valido + icona utilizzabile +
+service worker): con l'icona rotta l'evento `beforeinstallprompt` non scattava mai,
+quindi il pulsante Installa non compariva o non faceva nulla.
+
+Correzioni:
+1. Icone rigenerate: PNG 192x192 e 512x512 (richieste da Chrome/Android),
+   512x512 maskable, apple-touch-icon 180x180 per iOS, più un SVG valido.
+2. Manifest completo: id, scope, orientation e set di icone PNG con purpose separati
+   (any / maskable — "any maskable" insieme è sconsigliato).
+3. index.html: apple-touch-icon e meta apple-mobile-web-app-* (iOS non legge le
+   icone dal manifest).
+4. Pulsante Installa robusto: usa beforeinstallprompt dove esiste (Chrome/Edge/Android);
+   su iPhone/iPad mostra le istruzioni "Condividi → Aggiungi a schermata Home"
+   (iOS non ha alcuna API di installazione); il pulsante è visibile quando l'app
+   non è già installata e si nasconde dopo l'installazione (evento appinstalled).
+5. Service worker v6: strategia network-first per i file dell'app (gli aggiornamenti
+   arrivano subito, offline resta funzionante) e cache delle nuove icone.
+
+Requisiti da ricordare: la PWA è installabile solo via HTTPS (o http://localhost).
+Da GitHub Pages funziona; aprendo index.html come file:// no.
