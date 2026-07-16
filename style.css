@@ -16,3 +16,6 @@
 .tour-pin{background:#1d4ed8;color:#fff;border:2px solid #fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;box-shadow:0 1px 6px #0008}
 #tourLinks{display:grid;gap:6px;margin-top:8px}
 #tourLinks .button{text-decoration:none;color:inherit;background:#eff6ff;border-color:#93c5fd}
+.tour-num.island{background:#0d9488}
+#tourStats .detail-box b{font-size:14px}
+label input{margin-top:3px}

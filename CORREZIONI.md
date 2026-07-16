@@ -96,3 +96,35 @@ Da GitHub Pages funziona; aprendo index.html come file:// no.
   possono sovrastimare i cali — interpretare i badge di conseguenza.
 
 sw.js: cache v7 (necessario per distribuire i nuovi file).
+
+## v8 — Percorso realistico e costi di viaggio
+
+### Niente più percorsi attraverso il mare
+- Ogni tappa viene classificata per massa terrestre (Continente / Sardegna / Sicilia)
+  in base alle coordinate; lo Stretto di Messina separa correttamente Reggio Calabria
+  (continente) da Messina (Sicilia).
+- L'ottimizzazione avviene per sezione: le sezioni non vengono mai collegate via terra,
+  né sulla mappa né nei link di navigazione. Tra le sezioni l'app segnala "⛴ serve
+  traghetto/volo". I link Google Maps sono etichettati per sezione
+  ("Continente – tratta 1", "Sardegna", "Sicilia").
+
+### Percorso più corto (chilometrico)
+- Dopo il nearest-neighbor viene applicata l'euristica 2-opt, che elimina gli incroci
+  e accorcia il percorso (nei test: -20% su casi in cui il solo nearest-neighbor sbaglia).
+- I km mostrati sono quelli stradali reali calcolati con OSRM (router.project-osrm.org,
+  gratuito, senza chiave); se OSRM non risponde si usa la stima in linea d'aria ×1,3,
+  chiaramente etichettata come "stima".
+
+### Costi carburante e pedaggi (valori aggiornabili)
+- Parametri modificabili e salvati nel progetto: consumo (l/100km), prezzo carburante
+  (€/l), pedaggio (€/km) e % di km in autostrada.
+- Default impostati con i dati di luglio 2026: benzina self ~1,90 €/l (rilevazioni
+  Mimit metà luglio 2026); pedaggio classe A ~0,095 €/km IVA inclusa (tariffa media
+  0,07825 €/km + IVA 22%). Il prezzo carburante cambia ogni settimana: aggiornarlo
+  dal campo dedicato.
+- I pedaggi sono stimati SOLO sui km del continente: le autostrade siciliane
+  (A18/A19/A20/A29) sono in gran parte gratuite e in Sardegna non ci sono autostrade
+  a pedaggio.
+- Il riepilogo mostra: km per sezione, costo carburante, pedaggi e totale viaggio.
+
+sw.js: cache v8.

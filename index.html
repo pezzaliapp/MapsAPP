@@ -78,7 +78,14 @@
       </div>
       <div class="row"><button id="tourOptimize" class="primary">Ottimizza percorso</button></div>
       <div id="tourLinks"></div>
-      <small>“Ottimizza” ordina le tappe partendo dalla tua posizione (se autorizzi il GPS) e genera i link di navigazione Google Maps. Max 30 tappe; oltre 11 punti il percorso viene diviso in tratte.</small>
+      <div class="grid2" style="margin-top:8px">
+        <label style="font-size:11px;color:#6b7280">Consumo l/100km<input id="costConsumo" type="number" step="0.1" min="1" value="7" style="width:100%;padding:6px;border:1px solid #d1d5db;border-radius:8px"></label>
+        <label style="font-size:11px;color:#6b7280">Carburante €/l<input id="costPrezzo" type="number" step="0.01" min="0" value="1.90" style="width:100%;padding:6px;border:1px solid #d1d5db;border-radius:8px"></label>
+        <label style="font-size:11px;color:#6b7280">Pedaggio €/km<input id="costPedaggio" type="number" step="0.005" min="0" value="0.095" style="width:100%;padding:6px;border:1px solid #d1d5db;border-radius:8px"></label>
+        <label style="font-size:11px;color:#6b7280">% km in autostrada<input id="costQuota" type="number" step="5" min="0" max="100" value="60" style="width:100%;padding:6px;border:1px solid #d1d5db;border-radius:8px"></label>
+      </div>
+      <div id="tourStats" class="detail-grid" style="margin-top:8px"></div>
+      <small>“Ottimizza” ordina le tappe partendo dalla tua posizione (se autorizzi il GPS) e genera i link di navigazione Google Maps. Le tappe su Sardegna e Sicilia formano sezioni separate (serve traghetto/volo): il percorso non le collega mai via terra. Km stradali reali via OSRM; costi: carburante e pedaggi (tariffa media classe A, autostrade sarde/siciliane in gran parte gratuite quindi escluse). Prezzi aggiornabili nei campi qui sopra.</small>
     </section>
 
     <section class="stats">
