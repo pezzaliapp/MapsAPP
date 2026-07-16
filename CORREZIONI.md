@@ -71,3 +71,28 @@ Correzioni:
 
 Requisiti da ricordare: la PWA è installabile solo via HTTPS (o http://localhost).
 Da GitHub Pages funziona; aprendo index.html come file:// no.
+
+## v7 — Nuove funzioni: Giro visite e Stato clienti
+
+### Giro visite con percorso
+- Pulsante "+ Giro" su ogni cliente (elenco e scheda) e "Aggiungi filtrati" per
+  inserire in blocco i clienti del filtro corrente (max 30 tappe).
+- "Ottimizza percorso": ordina le tappe col criterio del più vicino, partendo dalla
+  posizione GPS dell'utente (se autorizzata) o dalla prima tappa; mostra i km stimati.
+- Percorso disegnato sulla mappa (linea tratteggiata blu + pin numerati).
+- Link "Apri in Google Maps" con navigazione multi-tappa; oltre 11 punti il percorso
+  viene diviso automaticamente in tratte concatenate (limite dell'URL di Google Maps).
+- Il giro è salvato nel progetto (IndexedDB ed export JSON).
+
+### Stato clienti (in calo / dormienti)
+- L'anno di riferimento è il più recente presente nei dati vendite.
+- "In calo": vendite nell'anno di riferimento inferiori al 60% dell'anno precedente
+  (badge rosso con la percentuale, es. "In calo -76% 2024→2025").
+- "Dormiente": storico vendite presente ma zero nell'anno di riferimento.
+- Nuovo filtro "Stato" (In calo / Dormienti / Attivi) e colori marker aggiornati:
+  rosso=in calo, grigio=dormiente, arancio=ordini aperti, verde=top, blu=altri
+  (legenda nel pannello filtri).
+- Attenzione: se l'anno di riferimento è l'anno in corso (parziale), i confronti
+  possono sovrastimare i cali — interpretare i badge di conseguenza.
+
+sw.js: cache v7 (necessario per distribuire i nuovi file).
