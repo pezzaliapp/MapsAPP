@@ -42,25 +42,23 @@
       <details class="multi" id="provinceBox" style="margin-top:8px"><summary id="provinceSummary">Tutte le province</summary><div class="multi-list" id="provinceList"></div></details>
       <input id="productSearch" list="productSuggestions" placeholder="Prodotto: codice o descrizione…" autocomplete="off">
       <datalist id="productSuggestions"></datalist>
-      <select id="typeFilter" style="width:100%;margin-top:8px" title="Tipo di cliente, ricostruito dalle categorie di prodotto acquistate">
-        <option value="">Tutti i tipi di cliente</option>
-        <option value="rivenditore">Rivenditori (7+ macchine)</option>
-        <option value="ricorrente">Clienti ricorrenti (2-6 macchine)</option>
-        <option value="utilizzatore">Utilizzatori finali (1 macchina)</option>
-        <option value="accessori">Solo accessori/ricambi</option>
+      <select id="typeFilter" style="width:100%;margin-top:8px" title="Che mestiere fa il cliente. Impostato da te nella scheda cliente; se non impostato l'app propone un suggerimento dal nome.">
+        <option value="">Tutti i tipi di attività</option>
+        <option value="officina">Officina / autoriparazione</option>
+        <option value="gommista">Gommista / pneumatici</option>
+        <option value="carrozzeria">Carrozzeria</option>
+        <option value="concessionaria">Concessionaria / autosalone</option>
+        <option value="rivenditore">Rivenditore / distributore attrezzature</option>
+        <option value="trasporti">Trasporti / autotrasporto / noleggio</option>
+        <option value="agente">Agente / intermediario</option>
+        <option value="altro">Altro</option>
+        <option value="__set">— solo quelli già classificati —</option>
+        <option value="__unset">— solo quelli DA classificare —</option>
       </select>
-      <select id="ageFilter" style="width:100%;margin-top:8px" title="Anni trascorsi dall'acquisto dell'ultima macchina">
-        <option value="">Macchina installata: qualsiasi età</option>
-        <option value="lt3">Meno di 3 anni (accessori, consumabili)</option>
-        <option value="lt5">Meno di 5 anni</option>
-        <option value="ge5">5 anni o più (candidati permuta)</option>
-        <option value="ge7">7 anni o più</option>
-      </select>
-      <select id="typeFilter" style="width:100%;margin-top:8px" title="Tipo di cliente, ricostruito dalle categorie di prodotto acquistate">
-        <option value="">Tutti i tipi di cliente</option>
-        <option value="rivenditore">Rivenditori (7+ macchine)</option>
-        <option value="ricorrente">Clienti ricorrenti (2-6 macchine)</option>
-        <option value="utilizzatore">Utilizzatori finali (1 macchina)</option>
+      <select id="behaviorFilter" style="width:100%;margin-top:8px" title="Comportamento d'acquisto: quante macchine ha comprato. È un fatto, non un'ipotesi sul mestiere.">
+        <option value="">Qualsiasi comportamento d'acquisto</option>
+        <option value="ripetuto">Acquisti ripetuti (2+ macchine)</option>
+        <option value="singolo">Una sola macchina</option>
         <option value="accessori">Solo accessori/ricambi</option>
       </select>
       <select id="ageFilter" style="width:100%;margin-top:8px" title="Anni trascorsi dall'acquisto dell'ultima macchina">

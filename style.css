@@ -46,3 +46,7 @@ label input{margin-top:3px}
 .ver.stale{background:#b45309;color:#fff}
 .upd-banner{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:9999;background:#111827;color:#fff;border-radius:12px;padding:10px 14px;display:flex;gap:12px;align-items:center;box-shadow:0 10px 40px #0006;font-size:14px}
 .upd-banner button{background:#dc2626;color:#fff;border:0;border-radius:8px;padding:7px 12px;font-weight:700;cursor:pointer}
+
+/* v13.1: suggerimento tipo attività nella scheda cliente */
+#detailBizHint{font-size:12px;line-height:1.4}
+#detailBizGuess{white-space:nowrap}

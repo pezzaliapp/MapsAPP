@@ -407,3 +407,53 @@ Prestazioni: classificazione di 1.788 clienti in ~30ms.
 Il file JSON va rigenerato o reimportato dagli Excel per contenere le classi.
 
 sw.js: cache v13.0.
+
+## v13.1 — Filtri duplicati e riprogettazione del "tipo cliente"
+
+### Bug: filtri duplicati nell'interfaccia
+I menu "Tipo di cliente" e "Macchina installata" comparivano **due volte**: uno script di
+modifica era stato eseguito due volte sullo stesso file e aveva inserito il blocco due
+volte, generando id HTML duplicati (`typeFilter`, `ageFilter`). Con id duplicati il
+browser aggancia gli eventi solo al primo elemento e il secondo resta inerte: da qui il
+comportamento erratico segnalato. Corretto, e aggiunto il controllo degli id duplicati
+alla verifica di ogni rilascio.
+
+### Il "tipo cliente" dedotto dagli acquisti era fuorviante
+La v13.0 classificava rivenditore/utilizzatore dal **numero di macchine acquistate**.
+Verifica sui dati reali, con ricerca online dei codici ATECO:
+- INDACO FORNITURE SRLSU → ATECO 46.62 (ingrosso macchine utensili), grossista di
+  attrezzature per gommisti. L'app diceva "utilizzatore finale" perché ha comprato
+  1 macchina.
+- COMPANY SERVICE S.p.A. → ATECO 45.31.01, si presenta come "fornitore globale di
+  officine e carrozzerie". L'app diceva "cliente ricorrente".
+- SIRE S.p.a. → ATECO 45.31.01, 28,8 M€ di fatturato. Idem.
+Tre su tre sbagliati: **quante macchine compri non dice che mestiere fai.**
+
+### Come funziona adesso: due concetti separati
+- **Tipo di attività** (che mestiere fa): officina · gommista · carrozzeria ·
+  concessionaria · rivenditore/distributore · trasporti · agente · altro.
+  Si imposta **nella scheda cliente** ed è il dato autorevole, perché gli agenti
+  conoscono i propri clienti. L'app propone un **suggerimento ricavato dal nome**
+  ("Suggerimento dal nome: Gommista — da confermare"), applicabile con un clic ma mai
+  dato per buono da solo. Il filtro include "solo quelli già classificati" e "solo
+  quelli da classificare" per lavorare la lista in modo ordinato.
+- **Comportamento d'acquisto** (fatto oggettivo, calcolato): acquisti ripetuti
+  (2+ macchine) · una sola macchina · solo accessori/ricambi. Non è più presentato come
+  un'identità.
+
+Il campo Tipo di attività viene salvato nel progetto, sopravvive alla rigenerazione del
+JSON, ed è esportato nella mailing list con la colonna CLASSIFICATO DA (impostato /
+suggerito dal nome), così si sa sempre quanto fidarsi del dato.
+
+Copertura attuale sui dati reali: 3 clienti verificati online e preimpostati
+(Company Service, SIRE, Indaco Forniture), 532 con suggerimento dal nome da confermare,
+1.253 da classificare.
+
+### Nota di metodo
+Il gestionale **non contiene alcun campo che dica il mestiere del cliente** (CLASSE 1
+CONTO è vuota su 2.907 righe su 3.216, nessun ATECO, nessuna partita IVA). Dal nome si
+classifica solo il 36% dei clienti, con margini d'errore. La strada strutturale è
+chiedere all'amministrazione di aggiungere **partita IVA e codice ATECO** all'export
+clienti: con quelli la classificazione diventa automatica e ufficiale per tutti i 1.788.
+
+sw.js: cache v13.1.
