@@ -37,8 +37,9 @@
       <input id="search" placeholder="Cerca cliente, città, provincia…">
       <div class="grid2">
         <select id="agentFilter"><option value="">Tutti gli agenti</option></select>
-        <select id="provinceFilter"><option value="">Tutte le province</option></select>
+        <details class="multi" id="regionBox"><summary id="regionSummary">Tutte le regioni</summary><div class="multi-list" id="regionList"></div></details>
       </div>
+      <details class="multi" id="provinceBox" style="margin-top:8px"><summary id="provinceSummary">Tutte le province</summary><div class="multi-list" id="provinceList"></div></details>
       <input id="productSearch" list="productSuggestions" placeholder="Prodotto: codice o descrizione…" autocomplete="off">
       <datalist id="productSuggestions"></datalist>
       <select id="statusFilter" style="width:100%;margin-top:8px">

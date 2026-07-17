@@ -153,3 +153,24 @@ versione precedente in cache). L'app disegnava comunque le linee in quell'ordine
    (Tropea, Capo Vaticano, Pizzo, Scilla, Cetraro restano continente).
 
 sw.js: cache v9.
+
+## v10 — Filtri geografici multipli: Regioni e Province
+
+- Il vecchio menu a tendina "provincia singola" è sostituito da due selettori a
+  spunta (checkbox): **Regioni** e **Province**. Si aprono/chiudono con un tap,
+  mostrano il conteggio clienti accanto a ogni voce e il riepilogo nel titolo
+  ("Regioni (2)", "Province (5)").
+- Semantica: più voci nella stessa casella = OR (es. MI + BG + BS); Regioni e
+  Province si combinano in AND. Selezionando una o più regioni, l'elenco province
+  mostra solo quelle delle regioni scelte; le province non più visibili vengono
+  deselezionate automaticamente.
+- Mappa completa delle 111 sigle provinciali italiane → 20 regioni (incluse le
+  sigle storiche sarde CI/VS/OT/OG e MB, BT, FM, SU). Province non riconosciute
+  (estero o refusi) finiscono nel gruppo "Altro/Estero".
+- Tutti gli strumenti a valle rispettano i nuovi filtri: elenco, mappa,
+  "Aggiungi filtrati" al giro visite, geocodifica dei filtrati, statistiche.
+- Nota: se il gestionale esporta il nome per esteso ("MILANO" invece di "MI"),
+  il filtro provincia funziona comunque per valore esatto, ma la voce ricade
+  in "Altro/Estero" a livello di regione.
+
+sw.js: cache v10.

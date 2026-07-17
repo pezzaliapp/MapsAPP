@@ -20,3 +20,14 @@
 #tourStats .detail-box b{font-size:14px}
 label input{margin-top:3px}
 .tour-pin.stale{background:#9ca3af}
+
+/* v10: filtri multiselezione regioni/province */
+.multi{position:relative;background:white;border:1px solid #d1d5db;border-radius:10px}
+.multi summary{padding:10px;cursor:pointer;list-style:none;font-size:14px;user-select:none}
+.multi summary::-webkit-details-marker{display:none}
+.multi summary::after{content:'▾';float:right;color:#6b7280}
+.multi[open] summary::after{content:'▴'}
+.multi-list{max-height:220px;overflow:auto;border-top:1px solid #e5e7eb;padding:6px}
+.multi-item{display:flex;align-items:center;gap:7px;padding:5px 6px;font-size:13px;border-radius:7px;cursor:pointer}
+.multi-item:hover{background:#f3f4f6}
+.multi-item .count{margin-left:auto;font-size:11px;color:#6b7280;background:#f3f4f6;border-radius:999px;padding:1px 7px}
