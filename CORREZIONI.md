@@ -252,3 +252,25 @@ Effetto sui dati reali: dormienti 658 → 572, in calo 62 → 40, attivi 139 →
   cambiano, non a ogni digitazione nei filtri (24ms → 0,2ms per ridisegno).
 
 sw.js: cache v12.
+
+## v12.0 — Versione visibile e avviso di aggiornamento
+
+Problema: non c'era modo di sapere quale versione stesse girando (la PWA serve i file
+dalla cache del service worker, quindi dopo un deploy si può continuare a usare la
+versione vecchia senza accorgersene).
+
+- **Badge versione nell'header**, accanto a "Maps APP": mostra "v12.0".
+  Se il sw.js sul server ha una versione diversa da quella attesa, il badge diventa
+  arancione e indica la versione trovata online.
+- **Avviso di aggiornamento**: quando il service worker scarica una versione più
+  recente, compare in basso un banner "È disponibile una versione più recente" con il
+  pulsante **Aggiorna ora**, che deregistra il vecchio service worker e ricarica.
+  Niente più doppi refresh manuali.
+- Controllo automatico degli aggiornamenti all'avvio e ogni ora.
+
+### Come verificare la versione a colpo d'occhio
+1. Badge nell'header: deve indicare v12.0 (grigio = allineato, arancione = da aggiornare).
+2. Sotto i filtri deve comparire: "Stato clienti calcolato su: 12 mesi al …"
+   (questa riga esiste solo dalla v12).
+3. Devono esserci: filtri Regioni/Province a spunta, pannello Mailing list,
+   campo "Punto di partenza" con pulsante GPS nel Giro visite.
