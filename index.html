@@ -44,7 +44,7 @@
       <datalist id="productSuggestions"></datalist>
       <select id="statusFilter" style="width:100%;margin-top:8px">
         <option value="">Tutti gli stati</option>
-        <option value="calo">In calo (ultimi 12 mesi vs 12 precedenti)</option>
+        <option value="calo">In calo (12 mesi o 6 mesi in calo)</option>
         <option value="dormiente">Dormienti (nessun acquisto da 12 mesi)</option>
         <option value="attivo">Attivi</option>
       </select>
@@ -68,7 +68,8 @@
       </div>
       <small>La geocodifica usa OpenStreetMap/Nominatim e richiede connessione. Le coordinate vengono poi salvate localmente.</small>
       <small id="refInfo" class="muted"></small>
-      <small>Marker: <b style="color:#dc2626">rosso</b>=in calo · <b style="color:#9ca3af">grigio</b>=dormiente · <b style="color:#f97316">arancio</b>=ordini aperti · <b style="color:#16a34a">verde</b>=top vendite · <b style="color:#3b82f6">blu</b>=altri</small>
+      <small class="muted">In calo = ultimi 12 mesi sotto il 60% dei 12 precedenti, <b>oppure</b> ultimi 6 mesi sotto il 60% degli stessi 6 mesi dell'anno prima (intercetta i cali recenti). Top = almeno 20.000 € negli ultimi 12 mesi.</small>
+      <small>Marker: <b style="color:#dc2626">rosso</b>=in calo · <b style="color:#9ca3af">grigio</b>=dormiente · <b style="color:#f97316">arancio</b>=ordini aperti · <b style="color:#16a34a">verde</b>=top (≥20k in 12 mesi) · <b style="color:#3b82f6">blu</b>=altri</small>
     </section>
 
     <section class="panel" id="tourPanel">

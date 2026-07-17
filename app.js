@@ -186,13 +186,31 @@ $('#status').textContent=`Partenza: ${project.tourStartLabel}. Premi Ottimizza p
 const WIN=new Map();let REF_END=0,REF_LABEL='',STATS_SIG='';
 function parseDMY(v){const m=/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(String(v||'').trim());return m?Date.UTC(+m[3],+m[2]-1,+m[1]):null}
 const DAY=86400000;
-function computeRefYear(force){const sig=`${Object.keys(project.clients).length}|${project.updatedAt||''}`;if(!force&&sig===STATS_SIG&&WIN.size)return;STATS_SIG=sig;let y=0,maxT=0;const all=Object.values(project.clients);
+
+function monthsSince(t){return t?Math.max(0,Math.round((REF_END-t)/(30.44*DAY))):null}
+
+const APP_VERSION='v12.1';
+function setVerBadge(txt,cls){const el=$('#verBadge');if(!el)return;el.textContent=txt;el.className='ver'+(cls?' '+cls:'')}
+function showUpdateBanner(){if($('#updBanner'))return;const d=document.createElement('div');d.id='updBanner';d.className='upd-banner';
+ d.innerHTML=`<span>È disponibile una versione più recente di Maps APP.</span><button type="button" id="updNow">Aggiorna ora</button>`;
+ document.body.appendChild(d);$('#updNow').onclick=async()=>{if('serviceWorker'in navigator){const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs)await r.unregister()}location.reload(true)};
+ setVerBadge(APP_VERSION+' · aggiornamento pronto','stale')}
+const SW_EXPECTED='maps-app-v12-1-trend-fix';
+async function checkVersion(){setVerBadge(APP_VERSION);
+ try{const res=await fetch('sw.js?ts='+Date.now(),{cache:'no-store'});const m=/const CACHE='([^']+)'/.exec(await res.text());
+  if(m&&m[1]!==SW_EXPECTED)setVerBadge(APP_VERSION+' \u2022 sul server: '+m[1].replace('maps-app-',''),'stale')}catch(e){}}
+const TOP_12M=20000,CALO_RATIO=0.6,CALO_MIN=3000;
+function computeRefYear(force){const sig=`${Object.keys(project.clients).length}|${project.updatedAt||''}`;if(!force&&sig===STATS_SIG&&WIN.size)return;STATS_SIG=sig;
+let y=0,maxT=0;const all=Object.values(project.clients);
 for(const c of all){for(const k of Object.keys(c.saleYears||{})){const n=num(k);if(n>y)y=n}for(const l of c.saleLines||[]){const t=parseDMY(l.date);if(t&&t>maxT&&t<=Date.now()+DAY)maxT=t}}
-REF_YEAR=y;REF_END=maxT||Date.now();const w1=REF_END-365*DAY,w2=REF_END-730*DAY;
+REF_YEAR=y;REF_END=maxT||Date.now();
+const w1=REF_END-365*DAY,w2=REF_END-730*DAY,h1=REF_END-182*DAY,h2=REF_END-547*DAY,h3=REF_END-365*DAY;
 WIN.clear();
-for(const c of all){let a=0,b=0,last=0,dated=false;
-for(const l of c.saleLines||[]){const t=parseDMY(l.date);if(!t)continue;dated=true;if(t>last)last=t;const v=num(l.amount);if(t>w1)a+=v;else if(t>w2)b+=v}
-WIN.set(c.id,{a,b,last,dated})}
+for(const c of all){let a=0,b=0,a6=0,b6=0,last=0,dated=false;
+for(const l of c.saleLines||[]){const t=parseDMY(l.date);if(!t)continue;dated=true;if(t>last)last=t;const v=num(l.amount);
+ if(t>w1)a+=v;else if(t>w2)b+=v;
+ if(t>h1)a6+=v;else if(t>h2&&t<=h3)b6+=v}
+WIN.set(c.id,{a,b,a6,b6,last,dated})}
 REF_LABEL=maxT?`12 mesi al ${new Date(REF_END).toLocaleDateString('it-IT')}`:`anno ${REF_YEAR}`}
 function monthsSince(t){return t?Math.max(0,Math.round((REF_END-t)/(30.44*DAY))):null}
 function clientStatus(c){const w=WIN.get(c.id);const hasOpen=(c.orders||0)>0;const sales=c.sales||0;
@@ -201,19 +219,11 @@ if(dated){cur=w.a;prev=w.b}
 else{const thisYear=new Date().getUTCFullYear();const ref=REF_YEAR>=thisYear?REF_YEAR-1:REF_YEAR;if(!ref)return{status:'',label:''};
  cur=(c.saleYears?.[ref]||0)+(REF_YEAR>=thisYear?(c.saleYears?.[REF_YEAR]||0):0);prev=c.saleYears?.[ref-1]||0}
 if(sales>0&&cur===0&&!hasOpen){const m=dated?monthsSince(w.last):null;return{status:'dormiente',label:m?`Dormiente da ${m} mesi`:'Dormiente'}}
-if(cur>0&&prev>0&&cur<prev*0.6)return{status:'calo',label:`In calo ${Math.round((cur-prev)/prev*100)}%${dated?' (12 mesi)':''}`};
+if(dated&&w.b6>=CALO_MIN&&w.a6<w.b6*CALO_RATIO){const p=Math.round((w.a6-w.b6)/w.b6*100);return{status:'calo',label:`In calo ${p}% (ultimi 6 mesi)`}}
+if(prev>=CALO_MIN&&cur<prev*CALO_RATIO)return{status:'calo',label:`In calo ${Math.round((cur-prev)/prev*100)}%${dated?' (12 mesi)':''}`};
 if(sales>0||hasOpen)return{status:'attivo',label:''};
 return{status:'',label:''}}
-const APP_VERSION='v12.0';
-function setVerBadge(txt,cls){const el=$('#verBadge');if(!el)return;el.textContent=txt;el.className='ver'+(cls?' '+cls:'')}
-function showUpdateBanner(){if($('#updBanner'))return;const d=document.createElement('div');d.id='updBanner';d.className='upd-banner';
- d.innerHTML=`<span>È disponibile una versione più recente di Maps APP.</span><button type="button" id="updNow">Aggiorna ora</button>`;
- document.body.appendChild(d);$('#updNow').onclick=async()=>{if('serviceWorker'in navigator){const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs)await r.unregister()}location.reload(true)};
- setVerBadge(APP_VERSION+' · aggiornamento pronto','stale')}
-const SW_EXPECTED='maps-app-v12-0-version-badge';
-async function checkVersion(){setVerBadge(APP_VERSION);
- try{const res=await fetch('sw.js?ts='+Date.now(),{cache:'no-store'});const m=/const CACHE='([^']+)'/.exec(await res.text());
-  if(m&&m[1]!==SW_EXPECTED)setVerBadge(APP_VERSION+' \u2022 sul server: '+m[1].replace('maps-app-',''),'stale')}catch(e){}}
+function isTop(c){const w=WIN.get(c.id);return (w?w.a:0)>=TOP_12M}
 function statusText(){const x=project.imports;return ['clienti','ordini','vendite'].map(k=>x[k]?`${k}: ${x[k].rows} righe`:`${k}: non importato`).join(' · ')}
 function selectedYears(){const from=num($('#yearFrom').value)||-Infinity,to=num($('#yearTo').value)||Infinity;return{from,to}}
 function lineYear(line){if(line.year)return num(line.year);const m=String(line.date||'').match(/(\d{4})$/);return m?num(m[1]):0}
@@ -225,7 +235,7 @@ function updateYears(){const years=new Set();for(const c of Object.values(projec
 function render(){computeRefYear();const all=Object.values(project.clients),view=filtered();fillSelect('#agentFilter',[...new Set(all.map(c=>c.agent).filter(Boolean))]);{const sig=[...new Set(all.map(provOf).filter(Boolean))].sort().join(',')+'|'+[...geoSel.regions].join(',');if(sig!==_geoSig)renderGeoFilters(all);}updateYears();updateProductSuggestions();const visibleLines=view.flatMap(matchingLines);const filteredSales=visibleLines.filter(x=>x.kind==='sale').reduce((s,x)=>s+x.amount,0),filteredOrders=visibleLines.filter(x=>x.kind==='order').reduce((s,x)=>s+x.amount,0);$('#clientCount').textContent=view.length;$('#mappedCount').textContent=view.filter(c=>c.lat!=null).length;$('#ordersTotal').textContent=euro(hasTransactionFilter()?filteredOrders:view.reduce((s,c)=>s+c.orders,0));$('#salesTotal').textContent=euro(hasTransactionFilter()?filteredSales:view.reduce((s,c)=>s+c.sales,0));$('#status').textContent=statusText();renderList(view);renderMarkers(view);renderTour();renderMailPanel();renderStart();if($('#refInfo'))$('#refInfo').textContent=`Stato clienti calcolato su: ${REF_LABEL}. I clienti con ordini aperti non sono mai classificati dormienti.`}
 function fillSelect(sel,vals){const el=$(sel),cur=el.value,label=el.options[0].text;el.innerHTML=`<option value="">${label}</option>`+vals.sort().map(v=>`<option>${escapeHtml(v)}</option>`).join('');el.value=cur}
 function renderList(items){$('#list').innerHTML=items.slice(0,400).map(c=>{const st=clientStatus(c),inTour=project.tour?.includes(c.id),lines=matchingLines(c),fs=lines.filter(x=>x.kind==='sale').reduce((s,x)=>s+x.amount,0),fo=lines.filter(x=>x.kind==='order').reduce((s,x)=>s+x.amount,0);return `<article class="client" data-id="${c.id}"><h3>${escapeHtml(c.name||c.id)}</h3><p>${escapeHtml([c.city,c.province,c.agent].filter(Boolean).join(' · '))}</p><div class="badges">${(hasTransactionFilter()?fo:c.orders)?`<span class="badge order">Ordini ${euro(hasTransactionFilter()?fo:c.orders)}</span>`:''}${(hasTransactionFilter()?fs:c.sales)?`<span class="badge sales">Vendite ${euro(hasTransactionFilter()?fs:c.sales)}</span>`:''}${hasTransactionFilter()?`<span class="badge">${lines.length} righe prodotto</span>`:''}${st.label?`<span class="badge ${st.status==='calo'?'risk':'sleep'}">${escapeHtml(st.label)}</span>`:''}${c.lat==null?'<span class="badge missing">Da geocodificare</span>':''}<button type="button" class="mini tour-add${inTour?' on':''}" data-tour="${c.id}">${inTour?'✓ Giro':'+ Giro'}</button></div></article>`}).join('')+(items.length>400?`<p style="padding:8px;opacity:.7"><small>Elenco limitato a 400 di ${items.length} clienti (la mappa li mostra tutti). Usa i filtri per restringere.</small></p>`:'');document.querySelectorAll('.client').forEach(x=>x.onclick=()=>openDetail(x.dataset.id));document.querySelectorAll('.tour-add').forEach(b=>b.onclick=e=>{e.stopPropagation();toggleTour(b.dataset.tour)})}
-function renderMarkers(items){if(!markers||typeof L==='undefined')return;markers.clearLayers();for(const c of items){if(c.lat==null)continue;const st=clientStatus(c);const cls=st.status==='calo'?'risk':st.status==='dormiente'?'sleep':c.orders>0?'order':c.sales>50000?'top':'';const icon=L.divIcon({className:'',html:`<div class="marker-dot ${cls}"></div>`,iconSize:[18,18],iconAnchor:[9,9]});const m=L.marker([c.lat,c.lng],{icon,draggable:true}).addTo(markers).bindTooltip(c.name||c.id);m.on('click',()=>openDetail(c.id));m.on('dragend',e=>{const p=e.target.getLatLng();c.lat=p.lat;c.lng=p.lng;c.manualPosition=true;save()})}}
+function renderMarkers(items){if(!markers||typeof L==='undefined')return;markers.clearLayers();for(const c of items){if(c.lat==null)continue;const st=clientStatus(c);const cls=st.status==='calo'?'risk':st.status==='dormiente'?'sleep':c.orders>0?'order':isTop(c)?'top':'';const icon=L.divIcon({className:'',html:`<div class="marker-dot ${cls}"></div>`,iconSize:[18,18],iconAnchor:[9,9]});const m=L.marker([c.lat,c.lng],{icon,draggable:true}).addTo(markers).bindTooltip(c.name||c.id);m.on('click',()=>openDetail(c.id));m.on('dragend',e=>{const p=e.target.getLatLng();c.lat=p.lat;c.lng=p.lng;c.manualPosition=true;save()})}}
 function openDetail(id){currentId=id;const c=project.clients[id];const years=Object.entries(c.saleYears||{}).sort((a,b)=>b[0]-a[0]).map(([y,v])=>`${y}: ${euro(v)}`).join('<br>')||'—';$('#detail').innerHTML=`<h2>${escapeHtml(c.name||c.id)}</h2><p>${escapeHtml([c.address,c.cap,c.city,c.province].filter(Boolean).join(', '))}</p><div class="detail-grid"><div class="detail-box"><b>${euro(c.orders)}</b><span>Ordini aperti</span></div><div class="detail-box"><b>${euro(c.sales)}</b><span>Vendite totali</span></div><div class="detail-box"><b>${escapeHtml(c.agent||'—')}</b><span>Agente</span></div><div class="detail-box"><b>${years}</b><span>Vendite per anno</span></div></div><div class="field"><label>Coordinate</label><div class="row"><input id="lat" value="${c.lat??''}" placeholder="Latitudine"><input id="lng" value="${c.lng??''}" placeholder="Longitudine"></div></div><div class="field"><label>Note locali</label><textarea id="note">${escapeHtml(c.note||'')}</textarea></div><div class="detail-actions"><button type="button" id="tourToggle">${project.tour?.includes(c.id)?'− Rimuovi dal giro':'+ Aggiungi al giro'}</button><button type="button" id="saveDetail" class="primary">Salva</button><a class="button" target="_blank" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.lat!=null?`${c.lat},${c.lng}`:[c.address,c.city,c.province].join(' '))}">Naviga</a></div><p><small>${c.phones?.map(escapeHtml).join(' · ')||''}<br>${c.emails?.map(escapeHtml).join(' · ')||''}</small></p>`;$('#tourToggle').onclick=()=>{toggleTour(id);$('#detailDialog').close()};$('#saveDetail').onclick=()=>{const lat=parseFloat($('#lat').value),lng=parseFloat($('#lng').value);c.lat=Number.isFinite(lat)?lat:null;c.lng=Number.isFinite(lng)?lng:null;c.manualPosition=Number.isFinite(lat)&&Number.isFinite(lng);c.note=$('#note').value;save();$('#detailDialog').close()};$('#detailDialog').showModal()}
 async function geocodeMissing(){const list=filtered().filter(c=>c.lat==null&&c.address&&c.city);if(!list.length)return alert('Nessun cliente da geocodificare nel filtro corrente.');if(!confirm(`Geocodificare ${list.length} indirizzi?`))return;let done=0;for(const c of list){$('#status').textContent=`Geocodifica ${done+1}/${list.length}: ${c.name}`;try{const tries=[[c.address,c.cap,c.city,c.province,'Italia'],[c.cap,c.city,c.province,'Italia'],[c.city,c.province,'Italia']];for(const parts of tries){const q=parts.filter(Boolean).join(', ');if(!q)continue;const res=await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=it&q=${encodeURIComponent(q)}`,{headers:{'Accept-Language':'it'}});const data=await res.json();if(data[0]){c.lat=Number(data[0].lat);c.lng=Number(data[0].lon);break}await new Promise(r=>setTimeout(r,1100))}}catch(e){console.warn(e)}done++;if(done%10===0)await persistProject();renderMarkers(filtered());await new Promise(r=>setTimeout(r,1100))}save();alert(`Geocodifica completata: ${done} indirizzi elaborati.`)}
 function exportProject(){const blob=new Blob([JSON.stringify(project,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`maps-app-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href)}

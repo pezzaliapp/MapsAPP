@@ -274,3 +274,48 @@ versione vecchia senza accorgersene).
    (questa riga esiste solo dalla v12).
 3. Devono esserci: filtri Regioni/Province a spunta, pannello Mailing list,
    campo "Punto di partenza" con pulsante GPS nel Giro visite.
+
+## v12.1 — Cali recenti nascosti e definizione di "TOP" (segnalazione BERTOROTTA)
+
+### Bug 1: la finestra a 12 mesi nasconde i crolli recenti
+Caso reale BERTOROTTA SRL (verde sulla mappa, ma in evidente caduta):
+- ultimi 12 mesi 70.363 € vs 12 precedenti 64.794 € → +9%: nessun allarme;
+- ma ultimi 6 mesi 15.126 € vs stessi 6 mesi dell'anno prima 31.578 € → **-52%**;
+- semestri: 2024 H2 33.216 € · 2025 H1 31.578 € · 2025 H2 55.237 € · 2026 H1 15.126 €.
+
+La finestra a 12 mesi è un indicatore lento: contiene ancora i mesi forti di 10 mesi fa
+e può mascherare un crollo per quasi un anno.
+→ Aggiunto un **secondo segnale a 6 mesi**: ultimi 6 mesi vs gli stessi 6 mesi dell'anno
+precedente (confronto neutro rispetto alla stagionalità). Un cliente è "in calo" se
+peggiora sulla finestra a 12 mesi **oppure** su quella a 6 mesi. L'etichetta indica quale
+segnale è scattato: "In calo -52% (ultimi 6 mesi)".
+Sui dati reali intercetta **15 cali** che prima erano invisibili, inclusi clienti che sulla
+finestra a 12 mesi risultavano addirittura +219% e +300%.
+
+### Bug 2: "TOP" calcolato sullo storico di sempre
+Il verde indicava "cliente sano" ma si basava sulle vendite cumulate dal 2019
+(`sales > 50.000 €`). Risultato: clienti fermi da anni restavano verdi grazie al passato —
+es. un cliente con 82.279 € di storico e **285 €** negli ultimi 12 mesi era verde.
+→ **TOP = almeno 20.000 € negli ultimi 12 mesi**. Sui dati reali sono 38 clienti che
+valgono il 66% del venduto dell'anno (soglia coerente con la distribuzione: i primi 10%
+dei clienti attivi fanno il 58% del fatturato). Lo storico resta visibile nella scheda
+cliente, ma non determina più il colore.
+
+### Bug 3 (emerso dai test): nessuna soglia anti-rumore sulla finestra a 12 mesi
+La regola a 6 mesi aveva una soglia minima, quella a 12 mesi no: venivano segnalati
+"in calo" clienti passati da 380 € a 205 €. → Soglia minima di **3.000 €** sul periodo di
+confronto per entrambe le finestre (esclude 5 micro-cali per 2.925 € complessivi).
+
+### Effetto sui dati reali (1.788 clienti, 15/07/2026)
+| Segmento | prima | dopo |
+|---|---:|---:|
+| In calo (rosso) | 40 | **50** |
+| Dormienti (grigio) | 572 | 572 |
+| Ordini aperti (arancio) | 38 | 37 |
+| Top (verde) | 24 | **15** |
+| Altri (blu) | 1.114 | 1.114 |
+
+Perdita dei clienti in calo: 851.882 € negli ultimi 12 mesi.
+Prestazioni invariate: ricalcolo 42ms una tantum, 0,15ms per ridisegno con cache.
+
+sw.js: cache v12.1.
