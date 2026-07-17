@@ -31,3 +31,12 @@ label input{margin-top:3px}
 .multi-item{display:flex;align-items:center;gap:7px;padding:5px 6px;font-size:13px;border-radius:7px;cursor:pointer}
 .multi-item:hover{background:#f3f4f6}
 .multi-item .count{margin-left:auto;font-size:11px;color:#6b7280;background:#f3f4f6;border-radius:999px;padding:1px 7px}
+
+/* v11: partenza giro e mailing list */
+.start-row{margin-top:8px;padding-top:8px;border-top:1px solid #f3f4f6}
+.start-ok{color:#166534;font-weight:600}
+.muted{color:#6b7280}
+.mail-info{background:#f3f4f6;border-radius:8px;padding:8px 10px;font-size:13px;margin-bottom:8px}
+.mail-client{padding:8px 0;border-bottom:1px solid #f3f4f6}
+.mail-name{font-size:13px;font-weight:600;margin-bottom:3px}
+#mailList .multi-item{font-size:12.5px}

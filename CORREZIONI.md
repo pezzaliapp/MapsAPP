@@ -174,3 +174,41 @@ sw.js: cache v9.
   in "Altro/Estero" a livello di regione.
 
 sw.js: cache v10.
+
+## v11 — Punto di partenza del giro e Mailing list
+
+### Punto di partenza selezionabile
+- Nel pannello Giro visite: campo "Punto di partenza" con pulsante **📍 GPS**
+  (posizione attuale) oppure **indirizzo digitato** (via, città o CAP), geocodificato
+  con Nominatim. La partenza scelta è salvata nel progetto e mostrata sotto il campo.
+- "Ottimizza percorso" non chiede più il GPS ogni volta: usa la partenza impostata.
+  Senza partenza, il percorso parte dalla prima tappa (comportamento dichiarato in UI).
+- Cambiando la partenza il percorso viene invalidato: va ripremuto "Ottimizza".
+- "Svuota" cancella le tappe ma NON la partenza impostata.
+
+### Mailing list (nuovo pannello)
+- Conta e mostra gli indirizzi dei **clienti filtrati**: "N indirizzi univoci da M
+  clienti su X filtrati", con evidenza di esclusi e clienti senza email.
+- **Esporta CSV mailing list**: file `mailing-list_AAAA-MM-GG.csv` con colonne
+  EMAIL, RAGIONE SOCIALE, CODICE CLIENTE, CITTA, PROVINCIA, REGIONE, AGENTE,
+  CLASSE ABC, STATO, VENDITE, ORDINI APERTI — utili per segmentare le campagne.
+  Formato: UTF-8 con BOM + CRLF + escaping RFC-4180 → si apre in Excel con doppio
+  clic (accenti corretti) e si importa in Mailchimp/Brevo/Outlook senza conversioni.
+- **Copia**: tutti gli indirizzi negli appunti separati da "; " per incollarli in CCN.
+- **Gestisci indirizzi**: elenco dei clienti filtrati con un flag per ogni indirizzo.
+  Togliendo la spunta l'indirizzo è escluso dall'export; l'esclusione è salvata nel
+  progetto (chiave cliente+indirizzo, quindi la stessa email su due clienti resta
+  indipendente). Pulsanti rapidi: Seleziona tutti / Deseleziona tutti /
+  Escludi PEC-amministrative (riconosce pec., legalmail, amministrazione@,
+  contabilita@, fatture@, ragioneria@).
+- Parsing email migliorato all'import: una cella con più indirizzi separati da
+  ";", ",", "/" o spazi viene divisa correttamente; gestiti "mailto:" e il formato
+  "Nome <mail@dom.it>"; indirizzi non validi scartati; dedup case-insensitive.
+
+Nota GDPR: l'export contiene dati personali di clienti. Usarlo per comunicazioni
+commerciali verso clienti esistenti è generalmente ammesso (soft spam opt-in,
+art. 130 c.4 Codice Privacy) purché ogni invio abbia un link di disiscrizione
+funzionante e si rispettino le richieste di cancellazione. Per i prospect mai
+attivati serve invece un consenso raccolto.
+
+sw.js: cache v11.

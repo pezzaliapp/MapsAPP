@@ -77,6 +77,14 @@
         <button id="tourAddFiltered">Aggiungi filtrati</button>
         <button id="tourClear">Svuota</button>
       </div>
+      <div class="start-row">
+        <label style="font-size:11px;color:#6b7280">Punto di partenza</label>
+        <div class="row" style="margin-top:4px">
+          <input id="startAddr" placeholder="Indirizzo, città o CAP…" autocomplete="off" style="flex:2;padding:8px;border:1px solid #d1d5db;border-radius:8px">
+          <button id="startGps" type="button" title="Usa la posizione attuale (GPS)" style="flex:0 0 auto">📍 GPS</button>
+        </div>
+        <div id="startInfo"></div>
+      </div>
       <div class="row"><button id="tourOptimize" class="primary">Ottimizza percorso</button></div>
       <div id="tourLinks"></div>
       <div class="grid2" style="margin-top:8px">
@@ -89,6 +97,17 @@
       <small>“Ottimizza” ordina le tappe partendo dalla tua posizione (se autorizzi il GPS) e genera i link di navigazione Google Maps. Le tappe su Sardegna e Sicilia formano sezioni separate (serve traghetto/volo): il percorso non le collega mai via terra. Km stradali reali via OSRM; costi: carburante e pedaggi (tariffa media classe A, autostrade sarde/siciliane in gran parte gratuite quindi escluse). Prezzi aggiornabili nei campi qui sopra.</small>
     </section>
 
+    <section class="panel" id="mailPanel">
+      <h2 style="margin:0 0 8px;font-size:16px">Mailing list <span id="mailCount"></span></h2>
+      <div id="mailInfo"></div>
+      <div class="row">
+        <button id="mailManage">Gestisci indirizzi</button>
+        <button id="mailCopy">Copia</button>
+      </div>
+      <div class="row"><button id="mailExport" class="primary">Esporta CSV mailing list</button></div>
+      <small>Esporta gli indirizzi dei <b>clienti filtrati</b>. Il CSV UTF-8 si apre in Excel e si importa in Mailchimp, Brevo e Outlook. In "Gestisci indirizzi" puoi escludere singoli indirizzi con i flag: l'esclusione resta salvata.</small>
+    </section>
+
     <section class="stats">
       <div><b id="clientCount">0</b><span>clienti</span></div>
       <div><b id="mappedCount">0</b><span>mappati</span></div>
@@ -99,6 +118,18 @@
   </aside>
   <div id="map"></div>
 </main>
+<dialog id="mailDialog"><div class="dialog-card">
+  <button class="close" id="mailClose" type="button">&times;</button>
+  <h2 style="margin:0 0 4px;font-size:20px">Indirizzi email dei clienti filtrati</h2>
+  <p style="margin:0 0 10px;color:#6b7280;font-size:13px">Togli la spunta agli indirizzi da escludere (es. PEC, contabilità, indirizzi non validi). La scelta è salvata nel progetto.</p>
+  <div class="row" style="margin:0 0 8px">
+    <button id="mailAll" type="button">Seleziona tutti</button>
+    <button id="mailNone" type="button">Deseleziona tutti</button>
+    <button id="mailNoPec" type="button" title="Escludi indirizzi PEC e caselle amministrative">Escludi PEC/amm.</button>
+  </div>
+  <div id="mailList" style="max-height:52vh;overflow:auto"></div>
+</div></dialog>
+
 <dialog id="detailDialog">
   <form method="dialog" class="dialog-card">
     <button class="close" value="cancel" aria-label="Chiudi">×</button>
