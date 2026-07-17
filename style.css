@@ -61,3 +61,7 @@ label input{margin-top:3px}
 .biz-tag.ok{background:#dcfce7;color:#166534}
 .biz-tag.guess{background:#fef3c7;color:#92400e}
 @media(max-width:640px){.biz-row{flex-wrap:wrap}.biz-sel{width:100%}}
+
+/* v13.4: i pulsanti ghost nelle finestre stanno su fondo bianco, non nell'header scuro */
+.dialog-card .ghost{color:#374151;border-color:#d1d5db;background:#fff}
+.dialog-card .ghost:hover{background:#f3f4f6}

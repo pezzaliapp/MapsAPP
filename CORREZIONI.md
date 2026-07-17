@@ -534,3 +534,41 @@ BERTOROTTA SRL, LA NUOVA MECCANICA DI CAMIOLO, GARAGE EQUIPMENT ASSISTANCE (indi
 A. Pezzali) · COMPANY SERVICE, SIRE, INDACO FORNITURE (verificati online sui codici ATECO).
 
 sw.js: cache v13.3.
+
+## v13.4 — Agente modificabile, categoria SERVICE, due bug
+
+### Agente correggibile dalla scheda
+Nella scheda cliente il campo **Agente di riferimento** ora si modifica: un menu con tutti
+gli agenti presenti nei dati, oppure un campo libero per scriverne uno nuovo. La correzione
+è salvata in `agentOverride`, **vince sul gestionale**, resta nel progetto e sopravvive al
+reimport degli Excel (come le coordinate e il tipo di attività). Svuotando entrambi i campi
+si torna al valore del gestionale. Filtro agenti, mappa ed export usano il valore corretto.
+Il riquadro in alto segnala "Agente (corretto a mano)" quando è stato modificato.
+
+### Categoria "Service / assistenza tecnica"
+Aggiunta alle categorie del tipo di attività, disponibile ovunque (scheda, filtro, pannello
+di classifica, export). Il suggerimento automatico la propone per ultima, perché "SERVICE"
+nel nome è un indizio debole: COMPANY SERVICE S.p.A. è un rivenditore.
+
+### Bug 1: il pulsante "Cerca online" era invisibile
+La classe `.ghost` era stata pensata per l'header scuro (`color:white`): dentro le finestre,
+su fondo bianco, il testo spariva e restava un rettangolo vuoto. Corretto con uno stile
+dedicato ai pulsanti dentro le finestre.
+
+### Bug 2: agenti fantasma ("30 A 180 GG", "ALLA CONSEGNA", "A VISTA")
+L'import leggeva il nome dell'agente con un ripiego: `DESCRIZIONE ELEMENTO_2 ||
+DESCRIZIONE ELEMENTO_1 || DESCRIZIONE ELEMENTO`. Quando il gestionale non ha una
+descrizione per il codice agente (codici 018, 029, 900), il ripiego pescava la colonna
+sbagliata — quella della **dilazione di pagamento** — e nel menu comparivano "agenti"
+come "30 A 180 GG", "N.12 SCADENZE DA 30 GG", "COME CONVENUTO", "RIENTRO".
+Ora la descrizione è presa dalla colonna immediatamente successiva ad AGENTE, senza
+ripieghi; se è vuota si mostra onestamente il codice ("cod. 029") invece di inventare un
+nome. Valori distinti nel menu agenti: da 25 (con 11 fantasma) a 19 reali.
+
+Da sapere: 021=CABASSI, 034=PEZZALI, 035=MARABELLI, 036=BRUNO, 037=DOLCE, 014=MARCHESI,
+010=IORI, 011=MORINI sono agenti; 950=SERVICE, 999=C&D, 940/941/939=ASS.EST./INT. sono
+canali interni; 777=RIENTRO e 888=FINANZ./LOCAZ. sono codici tecnici. I codici 018, 029 e
+900 (15 clienti) non hanno descrizione nel gestionale: vanno chiariti con l'amministrazione
+o corretti a mano dalla scheda.
+
+sw.js: cache v13.4.
