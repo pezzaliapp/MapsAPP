@@ -72,3 +72,11 @@ label input{margin-top:3px}
 .share-cols .multi-list{overflow:auto;border:1px solid #e5e7eb;border-radius:8px;border-top:1px solid #e5e7eb;padding:6px;max-height:32vh}
 .share-cols .row{gap:6px;align-items:center}
 @media(max-width:640px){.share-cols{grid-template-columns:1fr}.share-cols .multi-list{max-height:22vh}}
+
+/* v14.2: selezione multipla prodotti */
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;border-radius:999px;padding:3px 6px 3px 10px;font-size:12px;max-width:100%}
+.chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip button{border:0;background:#c7d2fe;color:#3730a3;border-radius:999px;width:18px;height:18px;line-height:1;padding:0;cursor:pointer;flex:none;font-size:13px}
+.chip button:hover{background:#a5b4fc}
+.prod-mode{display:flex;align-items:center;gap:7px;margin-top:8px;font-size:12.5px}

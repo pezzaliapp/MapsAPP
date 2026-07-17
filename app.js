@@ -195,13 +195,13 @@ const DAY=86400000;
 
 function monthsSince(t){return t?Math.max(0,Math.round((REF_END-t)/(30.44*DAY))):null}
 
-const APP_VERSION='v14.1';
+const APP_VERSION='v14.2';
 function setVerBadge(txt,cls){const el=$('#verBadge');if(!el)return;el.textContent=txt;el.className='ver'+(cls?' '+cls:'')}
 function showUpdateBanner(){if($('#updBanner'))return;const d=document.createElement('div');d.id='updBanner';d.className='upd-banner';
  d.innerHTML=`<span>È disponibile una versione più recente di Maps APP.</span><button type="button" id="updNow">Aggiorna ora</button>`;
  document.body.appendChild(d);$('#updNow').onclick=async()=>{if('serviceWorker'in navigator){const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs)await r.unregister()}location.reload(true)};
  setVerBadge(APP_VERSION+' · aggiornamento pronto','stale')}
-const SW_EXPECTED='maps-app-v14-1-layout-fix';
+const SW_EXPECTED='maps-app-v14-2-prodotti';
 async function checkVersion(){setVerBadge(APP_VERSION);
  try{const res=await fetch('sw.js?ts='+Date.now(),{cache:'no-store'});const m=/const CACHE='([^']+)'/.exec(await res.text());
   if(m&&m[1]!==SW_EXPECTED)setVerBadge(APP_VERSION+' \u2022 sul server: '+m[1].replace('maps-app-',''),'stale')}catch(e){}}
@@ -377,19 +377,68 @@ function mergeProject(p){
  project.emailsOff=[...(project.emailsOff||[]).filter(k=>!idsFile.has(String(k).split('|')[0])),...(p.emailsOff||[])];
  save();render();
  alert(`Fatto: ${tocchi} clienti aggiornati.`+(ignoti.length?`\n${ignoti.length} ignorati perch\u00e9 non presenti nel progetto.`:''))}
+// ---------- Filtro prodotti: selezione multipla ----------
+// Il confronto normalizza tutto (via trattini, punti, spazi doppi) e pretende che TUTTE le
+// parole cercate compaiano nella riga: così "051003670001 — PFA 50 PONTE" trova la riga
+// "051003670001 PFA 50 PONTE FORBICE", che con il confronto letterale non trovava nulla.
+const prodSel=[];
+const prodNorm=t=>String(t??'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+const prodTokens=t=>prodNorm(t).split(' ').filter(Boolean);
+function lineHay(x){return prodNorm(`${x.article} ${x.description}`)}
+// Un suggerimento ha la forma "CODICE — descrizione": in quel caso conta SOLO il codice,
+// perché lo stesso articolo può avere descrizioni diverse negli anni (es. 051003670001 è
+// sia "PFA 50 PONTE FORBICE INC-PAV-LIVAUT" sia "PFA 50 PONTE A FORBICE INCASSO-PAV.").
+function prodCode(q){const i=String(q).indexOf(' \u2014 ');return i>0?prodNorm(q.slice(0,i)):''}
+function lineMatches(x,q){const code=prodCode(q);
+ if(code)return prodNorm(x.article)===code;
+ const hay=lineHay(x);
+ return prodTokens(q).every(t=>hay.includes(t)||(t.replace(/^0+/,'')&&hay.includes(t.replace(/^0+/,''))))}
+function hasTransactionFilter(){return prodSel.length||norm($('#productSearch').value)||$('#yearFrom').value||$('#yearTo').value||$('#movementFilter').value!=='both'}
+function clientLines(c){const source=$('#movementFilter').value,{from,to}=selectedYears();let lines=[];
+ if(source!=='orders')lines.push(...(c.saleLines||[]).map(x=>({...x,kind:'sale'})));
+ if(source!=='sales')lines.push(...(c.orderLines||[]).map(x=>({...x,kind:'order'})));
+ return lines.filter(x=>{const y=lineYear(x);return y>=from&&y<=to})}
+function matchingLines(c){const lines=clientLines(c);
+ const q=norm($('#productSearch').value);
+ const cerca=[...prodSel]; if(q&&!prodSel.includes(q))cerca.push(q);
+ if(!cerca.length)return lines;
+ return lines.filter(x=>cerca.some(p=>lineMatches(x,p)))}
+function matchProducts(c){const q=norm($('#productSearch').value);
+ const cerca=[...prodSel]; if(q&&!prodSel.includes(q))cerca.push(q);
+ if(!cerca.length)return true;
+ const lines=clientLines(c);
+ // "tutti": il cliente deve avere una riga per ciascun prodotto scelto; altrimenti ne basta uno
+ return $('#prodAll')?.checked&&cerca.length>1
+  ? cerca.every(p=>lines.some(x=>lineMatches(x,p)))
+  : lines.some(x=>cerca.some(p=>lineMatches(x,p)))}
+function renderChips(){const box=$('#prodChips');if(!box)return;
+ box.innerHTML=prodSel.map((p,i)=>`<span class="chip" title="${escapeHtml(p)}"><span>${escapeHtml(p)}</span><button type="button" data-i="${i}" aria-label="Togli">&times;</button></span>`).join('');
+ box.querySelectorAll('button').forEach(b=>b.onclick=()=>{prodSel.splice(+b.dataset.i,1);renderChips();render()});
+ const m=$('#prodModeBox');if(m)m.hidden=prodSel.length<2}
+function addProd(){const v=norm($('#productSearch').value);if(!v)return;
+ if(!prodSel.includes(v))prodSel.push(v);
+ $('#productSearch').value='';renderChips();render()}
 function statusText(){const x=project.imports;return ['clienti','ordini','vendite'].map(k=>x[k]?`${k}: ${x[k].rows} righe`:`${k}: non importato`).join(' · ')}
 function selectedYears(){const from=num($('#yearFrom').value)||-Infinity,to=num($('#yearTo').value)||Infinity;return{from,to}}
 function lineYear(line){if(line.year)return num(line.year);const m=String(line.date||'').match(/(\d{4})$/);return m?num(m[1]):0}
-function matchingLines(c){const q=norm($('#productSearch').value).toLowerCase(),source=$('#movementFilter').value,{from,to}=selectedYears();let lines=[];if(source!=='orders')lines.push(...(c.saleLines||[]).map(x=>({...x,kind:'sale'})));if(source!=='sales')lines.push(...(c.orderLines||[]).map(x=>({...x,kind:'order'})));const qz=q.replace(/^0+/,'');return lines.filter(x=>{const y=lineYear(x);const hay=`${x.article} ${x.description}`.toLowerCase();return(!q||hay.includes(q)||(qz&&qz!==q&&hay.includes(qz)))&&y>=from&&y<=to})}
-function hasTransactionFilter(){return norm($('#productSearch').value)||$('#yearFrom').value||$('#yearTo').value||$('#movementFilter').value!=='both'}
-function filtered(){const q=norm($('#search').value).toLowerCase(),ag=$('#agentFilter').value;return Object.values(project.clients).filter(c=>(!q||[c.name,c.city,c.province,c.id].join(' ').toLowerCase().includes(q))&&(!ag||agentOf(c)===ag)&&(!geoSel.regions.size||geoSel.regions.has(regionOf(provOf(c))))&&(!geoSel.provinces.size||geoSel.provinces.has(provOf(c)))&&(!$('#onlyOrders').checked||c.orders>0)&&(!$('#onlySales').checked||c.sales>0)&&(!$('#onlyMissing').checked||c.lat==null)&&(!$('#statusFilter').value||clientStatus(c).status===$('#statusFilter').value)&&matchType(c)&&matchBehavior(c)&&matchAge(c)&&(!hasTransactionFilter()||matchingLines(c).length>0))}
+
+
+function filtered(){const q=norm($('#search').value).toLowerCase(),ag=$('#agentFilter').value;return Object.values(project.clients).filter(c=>(!q||[c.name,c.city,c.province,c.id].join(' ').toLowerCase().includes(q))&&(!ag||agentOf(c)===ag)&&(!geoSel.regions.size||geoSel.regions.has(regionOf(provOf(c))))&&(!geoSel.provinces.size||geoSel.provinces.has(provOf(c)))&&(!$('#onlyOrders').checked||c.orders>0)&&(!$('#onlySales').checked||c.sales>0)&&(!$('#onlyMissing').checked||c.lat==null)&&(!$('#statusFilter').value||clientStatus(c).status===$('#statusFilter').value)&&matchType(c)&&matchBehavior(c)&&matchAge(c)&&matchProducts(c)&&(!hasTransactionFilter()||matchingLines(c).length>0))}
 function matchType(c){const v=$('#typeFilter')?.value;if(!v)return true;
  if(v==='__set')return !!bizOf(c); if(v==='__unset')return !bizOf(c);
  return bizOf(c)===v || (!bizOf(c)&&guessBiz(c)===v)}
 function matchBehavior(c){const v=$('#behaviorFilter')?.value;return !v||behaviorOf(c).k===v}
 function matchAge(c){const v=$('#ageFilter')?.value;if(!v)return true;const a=macAgeYears(c);if(a==null)return false;
  if(v==='lt3')return a<3; if(v==='lt5')return a<5; if(v==='ge5')return a>=5; if(v==='ge7')return a>=7; return true}
-function updateProductSuggestions(){const q=norm($('#productSearch').value).toLowerCase(),seen=new Map();for(const c of Object.values(project.clients))for(const x of [...(c.saleLines||[]),...(c.orderLines||[])]){const label=[x.article,x.description].filter(Boolean).join(' — ');if(label&&(!q||label.toLowerCase().includes(q)))seen.set(label,label)}$('#productSuggestions').innerHTML=[...seen.values()].slice(0,250).map(v=>`<option value="${escapeHtml(v)}"></option>`).join('')}
+function updateProductSuggestions(){const q=prodNorm($('#productSearch').value),seen=new Map();
+ for(const c of Object.values(project.clients))for(const x of [...(c.saleLines||[]),...(c.orderLines||[])]){
+  if(!x.article&&!x.description)continue;
+  const key=x.article||x.description;
+  const label=[x.article,x.description].filter(Boolean).join(' \u2014 ');
+  if(seen.has(key))continue;
+  if(q&&!prodTokens(q).every(t=>prodNorm(label).includes(t)))continue;
+  seen.set(key,label)}
+ $('#productSuggestions').innerHTML=[...seen.values()].sort().slice(0,250).map(v=>`<option value="${escapeHtml(v)}"></option>`).join('')}
 function updateYears(){const years=new Set();for(const c of Object.values(project.clients))for(const x of [...(c.saleLines||[]),...(c.orderLines||[])]){const y=lineYear(x);if(y)years.add(y)}const vals=[...years].sort((a,b)=>b-a);for(const id of ['yearFrom','yearTo']){const el=$(`#${id}`),cur=el.value,label=id==='yearFrom'?'Da anno':'A anno';el.innerHTML=`<option value="">${label}</option>`+vals.map(y=>`<option value="${y}">${y}</option>`).join('');el.value=cur}}
 function render(){computeRefYear();const all=Object.values(project.clients),view=filtered();fillSelect('#agentFilter',[...new Set(all.map(agentOf).filter(Boolean))]);{const sig=[...new Set(all.map(provOf).filter(Boolean))].sort().join(',')+'|'+[...geoSel.regions].join(',');if(sig!==_geoSig)renderGeoFilters(all);}updateYears();updateProductSuggestions();const visibleLines=view.flatMap(matchingLines);const filteredSales=visibleLines.filter(x=>x.kind==='sale').reduce((s,x)=>s+x.amount,0),filteredOrders=visibleLines.filter(x=>x.kind==='order').reduce((s,x)=>s+x.amount,0);$('#clientCount').textContent=view.length;$('#mappedCount').textContent=view.filter(c=>c.lat!=null).length;$('#ordersTotal').textContent=euro(hasTransactionFilter()?filteredOrders:view.reduce((s,c)=>s+c.orders,0));$('#salesTotal').textContent=euro(hasTransactionFilter()?filteredSales:view.reduce((s,c)=>s+c.sales,0));$('#status').textContent=statusText();renderList(view);renderMarkers(view);renderTour();renderMailPanel();renderBizPanel();renderStart();if($('#refInfo'))$('#refInfo').innerHTML=`Stato clienti calcolato su: ${escapeHtml(REF_LABEL)}. I clienti con ordini aperti non sono mai classificati dormienti.${hasClassData()?'':' <b style="color:#b45309">Per i filtri Tipo cliente ed Età macchina reimporta il file vendite.</b>'}`}
 function fillSelect(sel,vals){const el=$(sel),cur=el.value,label=el.options[0].text;el.innerHTML=`<option value="">${label}</option>`+vals.sort().map(v=>`<option>${escapeHtml(v)}</option>`).join('');el.value=cur}
@@ -415,6 +464,9 @@ $('#excelInput').onchange=e=>importFiles([...e.target.files]);$('#projectInput')
  if(p.subset&&cur>n){const chi=[...(p.subset.agents||[]),...(p.subset.regions||[])].join(', ')||'selezione';
   if(!confirm(`Attenzione: questo \u00e8 un progetto PARZIALE (${n} clienti \u2014 ${chi}).\n\nAprendolo sostituisci il progetto che hai adesso, che ne contiene ${cur}: gli altri ${cur-n} spariscono da questo dispositivo.\n\nSe volevi solo riportare le correzioni dell'agente, annulla e usa "Unisci progetto".\n\nAprire lo stesso?`)){e.target.value='';return}}
  project=p;await save();fit()}catch{alert('Progetto non valido')}finally{e.target.value=''}};$('#exportBtn').onclick=exportProject;
+$('#prodAdd').onclick=addProd;
+$('#productSearch').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addProd()}});
+$('#prodAll').onchange=render;
 $('#shareBtn').onclick=()=>{renderShare();$('#shareDialog').showModal()};
 $('#shareClose').onclick=()=>$('#shareDialog').close();
 $('#shareExport').onclick=()=>{exportShare();$('#shareDialog').close()};

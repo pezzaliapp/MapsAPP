@@ -634,3 +634,37 @@ Lezione: quando l'app ha già un componente per una cosa, riusare la sua classe 
 rifare il markup a mano.
 
 sw.js: cache v14.1.
+
+## v14.2 — Il filtro prodotto non trovava nulla, e ora accetta più prodotti
+
+### Bug: selezionare un prodotto svuotava la mappa
+Il menu dei suggerimenti proponeva `051003670001 — PFA 50 PONTE FORBICE INC-PAV-LIVAUT`
+(codice, **trattino lungo**, descrizione), ma il confronto cercava quella stringa dentro
+`051003670001 PFA 50 PONTE FORBICE INC-PAV-LIVAUT` (codice, **spazio**, descrizione).
+Il trattino non c'era: nessuna riga corrispondeva mai. Chi sceglieva un suggerimento
+otteneva sempre zero clienti.
+
+Ora il confronto normalizza entrambe le parti (via trattini, punti, spazi doppi) e pretende
+che **tutte le parole cercate** compaiano nella riga, in qualsiasi forma. Sul caso segnalato:
+da 0 a 21 clienti.
+
+### Stesso codice, descrizioni diverse
+L'articolo 051003670001 compare nel gestionale con due diciture: "PFA 50 PONTE FORBICE
+INC-PAV-LIVAUT" (21 righe) e "PFA 50 PONTE A FORBICE INCASSO-PAV." (10 righe). Cercando
+l'etichetta intera si trovavano solo i clienti di una variante. Ora, quando la ricerca ha
+la forma "CODICE — descrizione" (cioè viene dai suggerimenti), conta **solo il codice**:
+chi sceglie dal menu vuole il prodotto, non la dicitura. Le due varianti danno lo stesso
+risultato: 21 clienti, come il codice nudo. I suggerimenti propongono una voce per codice
+articolo invece di una per ogni coppia codice+descrizione.
+
+### Selezione multipla
+Il prodotto scritto o scelto si aggiunge con **+** o con Invio e diventa un'etichetta
+rimovibile sotto il campo. Con due o più prodotti compare l'interruttore
+**"Deve averli comprati tutti"**: spento (predefinito) basta uno solo dei prodotti scelti,
+acceso il cliente deve averli comprati tutti.
+Verificato sui dati reali: PFA 50 + EQUILIBRATRICE danno 63 clienti in "almeno uno" e 3 in
+"tutti" (2A SRL, BISSA, GAMMA), controllati con un conteggio indipendente.
+Il campo di testo continua a funzionare come ricerca libera anche senza aggiungere nulla:
+"PFA 50" trova 58 clienti, "ponte forbice" 75.
+
+sw.js: cache v14.2.

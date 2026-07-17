@@ -44,7 +44,12 @@
         <details class="multi" id="regionBox"><summary id="regionSummary">Tutte le regioni</summary><div class="multi-list" id="regionList"></div></details>
       </div>
       <details class="multi" id="provinceBox" style="margin-top:8px"><summary id="provinceSummary">Tutte le province</summary><div class="multi-list" id="provinceList"></div></details>
-      <input id="productSearch" list="productSuggestions" placeholder="Prodotto: codice o descrizione…" autocomplete="off">
+      <div class="row" style="gap:6px">
+        <input id="productSearch" list="productSuggestions" placeholder="Prodotto: codice o descrizione…" autocomplete="off" style="flex:1">
+        <button id="prodAdd" type="button" class="mini" title="Aggiungi questo prodotto ai filtri (Invio)">+</button>
+      </div>
+      <div id="prodChips" class="chips"></div>
+      <label id="prodModeBox" class="prod-mode" hidden><input type="checkbox" id="prodAll"> Deve averli comprati <b>tutti</b><span class="muted"> (altrimenti basta uno)</span></label>
       <datalist id="productSuggestions"></datalist>
       <select id="typeFilter" style="width:100%;margin-top:8px" title="Che mestiere fa il cliente. Impostato da te nella scheda cliente; se non impostato l'app propone un suggerimento dal nome.">
         <option value="">Tutti i tipi di attività</option>
