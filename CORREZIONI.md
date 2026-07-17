@@ -500,3 +500,37 @@ online sui codici ATECO), LA NUOVA MECCANICA DI CAMIOLO e GARAGE EQUIPMENT ASSIS
 (indicati da A. Pezzali).
 
 sw.js: cache v13.2.
+
+## v13.3 — Il menu del tipo di attività nella scheda cliente (era assente)
+
+Segnalazione: nella scheda di BERTOROTTA SRL il riquadro diceva "da classificare" ma non
+c'era modo di cambiarlo.
+
+**Causa: un mio errore nella v13.1.** La scheda cliente non sta in index.html, è generata
+da JavaScript dentro app.js. La modifica che doveva inserire il menu cercava l'ancora in
+index.html, non l'ha trovata e si è interrotta; il codice che agganciava il menu, però, era
+già stato scritto e trovando `null` usciva in silenzio senza errori a schermo. Risultato:
+il riquadro informativo c'era, il menu no. Nessun test se n'era accorto perché provavano
+la logica e il pannello, non il contenuto della scheda.
+
+### Adesso
+- Nella scheda cliente c'è il menu **Tipo di attività** con le otto categorie: la scelta si
+  salva subito e si riflette su mappa, filtri ed export.
+- Accanto, il pulsante **Cerca online**: apre una ricerca web con ragione sociale, città,
+  provincia e "ATECO attività". L'app è una PWA statica e non può interrogare da sola i
+  registri camerali, ma il codice ATECO è la risposta definitiva e in un clic ce l'hai
+  davanti: si legge e si imposta la categoria dal menu.
+- Sotto, la riga di stato dice sempre da dove viene il dato: "Impostato da te, vince su ogni
+  suggerimento" · "Suggerimento dal nome: X — da confermare" · "Non deducibile dal nome".
+  Accanto, i fatti d'acquisto (n. macchine, età dell'ultima) per decidere senza uscire.
+
+### Test aggiunto
+Nuovo test che costruisce la scheda cliente vera nel DOM, verifica la presenza del menu e
+delle otto opzioni, simula la scelta dell'agente e controlla che il valore venga salvato e
+che l'etichetta cambi. È il test che mancava e che avrebbe intercettato subito il problema.
+
+### Clienti preimpostati nel progetto (6 rivenditori)
+BERTOROTTA SRL, LA NUOVA MECCANICA DI CAMIOLO, GARAGE EQUIPMENT ASSISTANCE (indicati da
+A. Pezzali) · COMPANY SERVICE, SIRE, INDACO FORNITURE (verificati online sui codici ATECO).
+
+sw.js: cache v13.3.
