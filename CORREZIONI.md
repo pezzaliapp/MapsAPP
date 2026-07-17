@@ -128,3 +128,28 @@ sw.js: cache v7 (necessario per distribuire i nuovi file).
 - Il riepilogo mostra: km per sezione, costo carburante, pedaggi e totale viaggio.
 
 sw.js: cache v8.
+
+## v9 — Percorso stradale reale e invalidazione del giro
+
+Diagnosi dallo screenshot: tappe con numeri non consecutivi sulle isole = giro in
+ordine di inserimento (modificato dopo l'ultima ottimizzazione o calcolato con la
+versione precedente in cache). L'app disegnava comunque le linee in quell'ordine
+(da lì le tratte sul mare) e le sezioni da 1 tappa non generavano alcun link
+(per questo comparivano solo pulsanti "Continente").
+
+1. **Invalidazione automatica**: qualsiasi modifica al giro (aggiunta/rimozione tappe)
+   marca il percorso come "da ricalcolare": i link di navigazione spariscono, i pin
+   diventano grigi e compare l'avviso "Giro modificato: premi Ottimizza percorso".
+   Niente più linee disegnate su ordini non ottimizzati.
+2. **Percorso stradale reale sulla mappa**: dopo l'ottimizzazione la mappa mostra la
+   geometria stradale effettiva restituita da OSRM (linea blu continua che segue
+   autostrade e strade vere), non più segmenti retti che tagliano il mare.
+   Se OSRM non risponde: linea tratteggiata schematica come prima.
+   La geometria è decimata a max 400 punti per sezione e salvata nel progetto.
+3. **Link anche per sezioni da 1 tappa**: una singola tappa in Sardegna/Sicilia ora
+   genera il suo pulsante "Sardegna (1 tappa)" con navigazione diretta.
+4. **Confine Sicilia esteso alle Eolie** (Stromboli, Panarea, Lipari → sezione Sicilia,
+   raggiungibili in traghetto da lì); costa calabra verificata città per città
+   (Tropea, Capo Vaticano, Pizzo, Scilla, Cetraro restano continente).
+
+sw.js: cache v9.
