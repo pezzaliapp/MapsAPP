@@ -42,6 +42,34 @@
       <details class="multi" id="provinceBox" style="margin-top:8px"><summary id="provinceSummary">Tutte le province</summary><div class="multi-list" id="provinceList"></div></details>
       <input id="productSearch" list="productSuggestions" placeholder="Prodotto: codice o descrizione…" autocomplete="off">
       <datalist id="productSuggestions"></datalist>
+      <select id="typeFilter" style="width:100%;margin-top:8px" title="Tipo di cliente, ricostruito dalle categorie di prodotto acquistate">
+        <option value="">Tutti i tipi di cliente</option>
+        <option value="rivenditore">Rivenditori (7+ macchine)</option>
+        <option value="ricorrente">Clienti ricorrenti (2-6 macchine)</option>
+        <option value="utilizzatore">Utilizzatori finali (1 macchina)</option>
+        <option value="accessori">Solo accessori/ricambi</option>
+      </select>
+      <select id="ageFilter" style="width:100%;margin-top:8px" title="Anni trascorsi dall'acquisto dell'ultima macchina">
+        <option value="">Macchina installata: qualsiasi età</option>
+        <option value="lt3">Meno di 3 anni (accessori, consumabili)</option>
+        <option value="lt5">Meno di 5 anni</option>
+        <option value="ge5">5 anni o più (candidati permuta)</option>
+        <option value="ge7">7 anni o più</option>
+      </select>
+      <select id="typeFilter" style="width:100%;margin-top:8px" title="Tipo di cliente, ricostruito dalle categorie di prodotto acquistate">
+        <option value="">Tutti i tipi di cliente</option>
+        <option value="rivenditore">Rivenditori (7+ macchine)</option>
+        <option value="ricorrente">Clienti ricorrenti (2-6 macchine)</option>
+        <option value="utilizzatore">Utilizzatori finali (1 macchina)</option>
+        <option value="accessori">Solo accessori/ricambi</option>
+      </select>
+      <select id="ageFilter" style="width:100%;margin-top:8px" title="Anni trascorsi dall'acquisto dell'ultima macchina">
+        <option value="">Macchina installata: qualsiasi età</option>
+        <option value="lt3">Meno di 3 anni (accessori, consumabili)</option>
+        <option value="lt5">Meno di 5 anni</option>
+        <option value="ge5">5 anni o più (candidati permuta)</option>
+        <option value="ge7">7 anni o più</option>
+      </select>
       <select id="statusFilter" style="width:100%;margin-top:8px">
         <option value="">Tutti gli stati</option>
         <option value="calo">In calo (12 mesi o 6 mesi in calo)</option>

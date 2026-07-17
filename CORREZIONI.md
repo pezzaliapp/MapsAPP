@@ -359,3 +359,51 @@ In calo 50 → **47** · Ordini aperti 37 → **40** · Dormienti 572 · Top 15 
 Perdita dei clienti in calo: 798.842 € negli ultimi 12 mesi.
 
 sw.js: cache v12.2.
+
+## v13.0 — Tipo cliente e età della macchina installata
+
+Novità richiesta: distinguere sulla mappa il rivenditore dall'utilizzatore finale, per
+non trattare come "perso" chi semplicemente non compra un ponte sollevatore ogni anno.
+
+### Import
+Le righe di vendita e di ordine ora conservano il codice della **classe merceologica**
+(colonna `CLASSE 3 ARTICOLO`, prima scartata). La descrizione della classe viene appresa
+dalla colonna immediatamente successiva del file e salvata in `project.classes`, quindi
+non ci sono codici cablati nel programma: se Cormach cambia la codifica, l'app si adegua
+al prossimo import. Classi riconosciute nei dati reali: 17.
+
+Macchine = ponti, smontagomme, equilibratrici, assetti, sollevatori/cric, profilometro,
+sanificatori, usato. Accessori = accessori, ricambi, componenti.
+
+### Classificazione automatica
+- **Rivenditore**: 7 o più acquisti di macchine (eventi distinti, acquisti entro 90
+  giorni contano come un solo evento).
+- **Cliente ricorrente**: 2-6 macchine.
+- **Utilizzatore finale**: una sola macchina.
+- **Solo accessori/ricambi**: nessuna macchina, solo consumo.
+- **Età macchina**: anni trascorsi dall'ultimo acquisto di una macchina.
+
+### Interfaccia
+- Due nuovi filtri: **Tipo cliente** ed **Età della macchina installata**
+  (meno di 3 anni · meno di 5 · 5 anni o più = candidati permuta · 7 anni o più).
+  Si combinano con tutti i filtri esistenti: "Dormienti + Utilizzatore finale +
+  macchina 5+ anni + Lombardia" costruisce il giro permute in un clic.
+- Scheda cliente: tipo cliente, età e descrizione dell'ultima macchina acquistata.
+- Export CSV mailing list: tre colonne nuove — TIPO CLIENTE, ANNI MACCHINA,
+  ULTIMA MACCHINA — per campagne mirate sul parco installato.
+- Se il progetto caricato non ha i dati di classe (export precedenti alla v13), i filtri
+  restano inattivi e compare l'avviso di reimportare il file vendite.
+
+### Verifica sui dati reali (1.788 clienti)
+Rivenditori 63 (11,24 M€ di storico) · Ricorrenti 161 (3,55 M€) · Utilizzatori finali
+352 (1,98 M€) · Solo accessori 232 (166 k€) · Nessun acquisto 980.
+
+Dentro i 572 dormienti: 84 rivenditori/ricorrenti fermi (2,11 M€), 260 utilizzatori
+finali (1,41 M€, macchina di 4,2 anni in media), 188 da soli accessori (87 k€), 40 altro.
+Dei 260 utilizzatori, 162 hanno una macchina di meno di 5 anni (accessori e consumabili)
+e 98 di 5 anni o più (candidati permuta).
+
+Prestazioni: classificazione di 1.788 clienti in ~30ms.
+Il file JSON va rigenerato o reimportato dagli Excel per contenere le classi.
+
+sw.js: cache v13.0.
