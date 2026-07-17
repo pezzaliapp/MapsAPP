@@ -195,13 +195,13 @@ const DAY=86400000;
 
 function monthsSince(t){return t?Math.max(0,Math.round((REF_END-t)/(30.44*DAY))):null}
 
-const APP_VERSION='v14.2';
+const APP_VERSION='v14.3';
 function setVerBadge(txt,cls){const el=$('#verBadge');if(!el)return;el.textContent=txt;el.className='ver'+(cls?' '+cls:'')}
 function showUpdateBanner(){if($('#updBanner'))return;const d=document.createElement('div');d.id='updBanner';d.className='upd-banner';
  d.innerHTML=`<span>È disponibile una versione più recente di Maps APP.</span><button type="button" id="updNow">Aggiorna ora</button>`;
  document.body.appendChild(d);$('#updNow').onclick=async()=>{if('serviceWorker'in navigator){const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs)await r.unregister()}location.reload(true)};
  setVerBadge(APP_VERSION+' · aggiornamento pronto','stale')}
-const SW_EXPECTED='maps-app-v14-2-prodotti';
+const SW_EXPECTED='maps-app-v14-3-modelli';
 async function checkVersion(){setVerBadge(APP_VERSION);
  try{const res=await fetch('sw.js?ts='+Date.now(),{cache:'no-store'});const m=/const CACHE='([^']+)'/.exec(await res.text());
   if(m&&m[1]!==SW_EXPECTED)setVerBadge(APP_VERSION+' \u2022 sul server: '+m[1].replace('maps-app-',''),'stale')}catch(e){}}
@@ -385,14 +385,29 @@ const prodSel=[];
 const prodNorm=t=>String(t??'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 const prodTokens=t=>prodNorm(t).split(' ').filter(Boolean);
 function lineHay(x){return prodNorm(`${x.article} ${x.description}`)}
-// Un suggerimento ha la forma "CODICE — descrizione": in quel caso conta SOLO il codice,
-// perché lo stesso articolo può avere descrizioni diverse negli anni (es. 051003670001 è
-// sia "PFA 50 PONTE FORBICE INC-PAV-LIVAUT" sia "PFA 50 PONTE A FORBICE INCASSO-PAV.").
+// I dati hanno DUE patologie opposte, e il filtro deve reggerle entrambe:
+//  1. stesso codice, descrizioni diverse (051003670001 = "PFA 50 PONTE FORBICE INC-PAV-LIVAUT"
+//     e "PFA 50 PONTE A FORBICE INCASSO-PAV.") -> se cerco solo la descrizione perdo clienti;
+//  2. stessa descrizione, codici diversi ("PUMA CE 1ph 230V 50-60Hz" sta sotto 001002080001
+//     con 33 clienti e sotto 001002980001 con 2) -> se cerco solo il codice ne perdo la maggior parte.
+// Quindi un suggerimento "CODICE — descrizione" vale per il codice OPPURE per la descrizione:
+// chi sceglie una macchina dal menu vuole tutti quelli che hanno quella macchina.
 function prodCode(q){const i=String(q).indexOf(' \u2014 ');return i>0?prodNorm(q.slice(0,i)):''}
+function prodDesc(q){const i=String(q).indexOf(' \u2014 ');return i>0?q.slice(i+3):''}
+// Come si confronta una parola cercata con la riga:
+//  - se contiene cifre (codici, "535", "230V", "1ph") vale anche come pezzo di parola,
+//    così "5100367" trova "051003670001" e "535" trova "535S";
+//  - se è lunga (PUMA, FORBICE) idem;
+//  - se è corta e senza cifre ("a", "ce", "gt", "pav") deve essere una parola INTERA:
+//    altrimenti la "a" di "PONTE A FORBICE" sta dentro qualsiasi descrizione e il filtro
+//    restituisce mezzo archivio.
+function tokenIn(hay,words,t){const z=t.replace(/^0+/,'');
+ const pezzo=()=>hay.includes(t)||(z&&z!==t&&hay.includes(z));
+ return /\d/.test(t)||t.length>=4?pezzo():words.has(t)}
+function tokensIn(hay,q){const words=new Set(hay.split(' '));return prodTokens(q).every(t=>tokenIn(hay,words,t))}
 function lineMatches(x,q){const code=prodCode(q);
- if(code)return prodNorm(x.article)===code;
- const hay=lineHay(x);
- return prodTokens(q).every(t=>hay.includes(t)||(t.replace(/^0+/,'')&&hay.includes(t.replace(/^0+/,''))))}
+ if(code)return prodNorm(x.article)===code||tokensIn(prodNorm(x.description),prodDesc(q));
+ return tokensIn(lineHay(x),q)}
 function hasTransactionFilter(){return prodSel.length||norm($('#productSearch').value)||$('#yearFrom').value||$('#yearTo').value||$('#movementFilter').value!=='both'}
 function clientLines(c){const source=$('#movementFilter').value,{from,to}=selectedYears();let lines=[];
  if(source!=='orders')lines.push(...(c.saleLines||[]).map(x=>({...x,kind:'sale'})));
@@ -430,15 +445,18 @@ function matchType(c){const v=$('#typeFilter')?.value;if(!v)return true;
 function matchBehavior(c){const v=$('#behaviorFilter')?.value;return !v||behaviorOf(c).k===v}
 function matchAge(c){const v=$('#ageFilter')?.value;if(!v)return true;const a=macAgeYears(c);if(a==null)return false;
  if(v==='lt3')return a<3; if(v==='lt5')return a<5; if(v==='ge5')return a>=5; if(v==='ge7')return a>=7; return true}
-function updateProductSuggestions(){const q=prodNorm($('#productSearch').value),seen=new Map();
+// Un suggerimento per MODELLO (descrizione), non per codice: lo stesso PUMA sta sotto 5 codici
+// e proporli tutti costringerebbe a indovinare quale sia quello "giusto". Accanto, il numero
+// di clienti che l'hanno comprato, così si vede subito se la voce scelta è quella grossa.
+function updateProductSuggestions(){const q=prodNorm($('#productSearch').value),mod=new Map();
  for(const c of Object.values(project.clients))for(const x of [...(c.saleLines||[]),...(c.orderLines||[])]){
-  if(!x.article&&!x.description)continue;
-  const key=x.article||x.description;
-  const label=[x.article,x.description].filter(Boolean).join(' \u2014 ');
-  if(seen.has(key))continue;
-  if(q&&!prodTokens(q).every(t=>prodNorm(label).includes(t)))continue;
-  seen.set(key,label)}
- $('#productSuggestions').innerHTML=[...seen.values()].sort().slice(0,250).map(v=>`<option value="${escapeHtml(v)}"></option>`).join('')}
+  const d=norm(x.description);if(!d&&!x.article)continue;
+  const key=prodNorm(d)||prodNorm(x.article);
+  if(!mod.has(key))mod.set(key,{label:d||x.article,cli:new Set()});
+  mod.get(key).cli.add(c.id)}
+ const out=[...mod.values()].filter(m=>!q||tokensIn(prodNorm(m.label),q))
+  .sort((a,b)=>b.cli.size-a.cli.size).slice(0,250);
+ $('#productSuggestions').innerHTML=out.map(m=>`<option value="${escapeHtml(m.label)}">${m.cli.size} client${m.cli.size===1?'e':'i'}</option>`).join('')}
 function updateYears(){const years=new Set();for(const c of Object.values(project.clients))for(const x of [...(c.saleLines||[]),...(c.orderLines||[])]){const y=lineYear(x);if(y)years.add(y)}const vals=[...years].sort((a,b)=>b-a);for(const id of ['yearFrom','yearTo']){const el=$(`#${id}`),cur=el.value,label=id==='yearFrom'?'Da anno':'A anno';el.innerHTML=`<option value="">${label}</option>`+vals.map(y=>`<option value="${y}">${y}</option>`).join('');el.value=cur}}
 function render(){computeRefYear();const all=Object.values(project.clients),view=filtered();fillSelect('#agentFilter',[...new Set(all.map(agentOf).filter(Boolean))]);{const sig=[...new Set(all.map(provOf).filter(Boolean))].sort().join(',')+'|'+[...geoSel.regions].join(',');if(sig!==_geoSig)renderGeoFilters(all);}updateYears();updateProductSuggestions();const visibleLines=view.flatMap(matchingLines);const filteredSales=visibleLines.filter(x=>x.kind==='sale').reduce((s,x)=>s+x.amount,0),filteredOrders=visibleLines.filter(x=>x.kind==='order').reduce((s,x)=>s+x.amount,0);$('#clientCount').textContent=view.length;$('#mappedCount').textContent=view.filter(c=>c.lat!=null).length;$('#ordersTotal').textContent=euro(hasTransactionFilter()?filteredOrders:view.reduce((s,c)=>s+c.orders,0));$('#salesTotal').textContent=euro(hasTransactionFilter()?filteredSales:view.reduce((s,c)=>s+c.sales,0));$('#status').textContent=statusText();renderList(view);renderMarkers(view);renderTour();renderMailPanel();renderBizPanel();renderStart();if($('#refInfo'))$('#refInfo').innerHTML=`Stato clienti calcolato su: ${escapeHtml(REF_LABEL)}. I clienti con ordini aperti non sono mai classificati dormienti.${hasClassData()?'':' <b style="color:#b45309">Per i filtri Tipo cliente ed Età macchina reimporta il file vendite.</b>'}`}
 function fillSelect(sel,vals){const el=$(sel),cur=el.value,label=el.options[0].text;el.innerHTML=`<option value="">${label}</option>`+vals.sort().map(v=>`<option>${escapeHtml(v)}</option>`).join('');el.value=cur}

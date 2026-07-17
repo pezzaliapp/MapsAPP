@@ -668,3 +668,57 @@ Il campo di testo continua a funzionare come ricerca libera anche senza aggiunge
 "PFA 50" trova 58 clienti, "ponte forbice" 75.
 
 sw.js: cache v14.2.
+
+## v14.3 — Il filtro prodotto cercava il codice, ma la macchina è il nome
+
+Segnalazione: selezionando `001002980001 — PUMA CE 1ph 230V 50-60Hz` e
+`001002540001 — F 535S GT CE 3ph 400V 2 Vel` comparivano cinque clienti in croce.
+"Impossibile che solo questi clienti abbiano acquistato queste macchine."
+
+### Cosa dicono i dati (verificato su vendite.xlsx, 16.387 righe)
+**Lo stesso modello sta sotto molti codici articolo diversi.**
+
+PUMA CE 1ph 230V 50-60Hz — stessa identica descrizione, cinque codici:
+| codice | righe | clienti |
+|---|---|---|
+| 001002080001 | 90 | 33 |
+| 001002980001 (quello selezionato) | 2 | 2 |
+| 001002080002 · 001004150001 · 001004350001 | 1 ciascuno | 1 |
+
+F 535S GT CE 3ph 400V 2 Vel: 001003190001 ha 75 righe e 40 clienti, 001002540001
+(quello selezionato) ne ha 2. PFA 50 PONTE A FORBICE INCASSO-PAV. sta sotto tre codici
+(051002990001 con 28 clienti, 051003670001 con 5, 051003320001 con 1).
+"PUMA" nella descrizione compare in **78 codici** diversi (macchine, ricambi, accessori),
+"F 535" in 39.
+
+La v14.2, filtrando solo sul codice, su questi casi perdeva il 90% dei clienti.
+
+### Come funziona adesso
+- Un suggerimento nella forma "CODICE — descrizione" vale per il **codice OPPURE per la
+  descrizione**: chi sceglie una macchina vuole tutti quelli che hanno quella macchina,
+  sotto qualunque codice sia stata fatturata. Regge entrambe le patologie dei dati: stesso
+  codice con descrizioni diverse (051003670001) e stessa descrizione sotto codici diversi
+  (PUMA).
+- **I suggerimenti ora sono per modello, non per codice**, ordinati per numero di clienti e
+  con il conteggio accanto: si vede subito che "PUMA CE 1ph 230V 50-60Hz" vale 37 clienti,
+  e non c'è più da indovinare quale dei cinque codici sia quello buono.
+- Le parole corte senza cifre ("a", "ce", "gt", "pav") ora devono corrispondere a parole
+  intere. Cercando "PFA 50 PONTE **A** FORBICE" la lettera "a", trattata come pezzo di testo,
+  entrava dentro qualsiasi descrizione e restituiva mezzo archivio. Le parole con cifre
+  ("535", "230V", "5100367") valgono ancora come pezzo, così le ricerche parziali sui codici
+  continuano a funzionare.
+
+### Risultati sul caso segnalato
+| ricerca | prima | adesso |
+|---|---|---|
+| 001002980001 — PUMA CE 1ph 230V 50-60Hz | 2 | **37** |
+| 001002540001 — F 535S GT CE 3ph 400V 2 Vel | 2 | **44** |
+| PUMA (tutta la famiglia, ricambi inclusi) | — | 104 |
+| F 535 (tutta la famiglia) | — | 157 |
+
+### Nota sui file
+Il file `stampa_vendite_10_07_26.xlsx` allegato per il controllo ha 16.326 righe contro le
+16.387 di `vendite.xlsx`: è la stessa stampa, ma ferma al 10/07. Il progetto resta basato su
+`vendite.xlsx`, che arriva al 15/07/2026.
+
+sw.js: cache v14.3.
