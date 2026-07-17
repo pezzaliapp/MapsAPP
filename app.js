@@ -195,13 +195,13 @@ const DAY=86400000;
 
 function monthsSince(t){return t?Math.max(0,Math.round((REF_END-t)/(30.44*DAY))):null}
 
-const APP_VERSION='v14.0';
+const APP_VERSION='v14.1';
 function setVerBadge(txt,cls){const el=$('#verBadge');if(!el)return;el.textContent=txt;el.className='ver'+(cls?' '+cls:'')}
 function showUpdateBanner(){if($('#updBanner'))return;const d=document.createElement('div');d.id='updBanner';d.className='upd-banner';
  d.innerHTML=`<span>È disponibile una versione più recente di Maps APP.</span><button type="button" id="updNow">Aggiorna ora</button>`;
  document.body.appendChild(d);$('#updNow').onclick=async()=>{if('serviceWorker'in navigator){const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs)await r.unregister()}location.reload(true)};
  setVerBadge(APP_VERSION+' · aggiornamento pronto','stale')}
-const SW_EXPECTED='maps-app-v14-0-condivisione';
+const SW_EXPECTED='maps-app-v14-1-layout-fix';
 async function checkVersion(){setVerBadge(APP_VERSION);
  try{const res=await fetch('sw.js?ts='+Date.now(),{cache:'no-store'});const m=/const CACHE='([^']+)'/.exec(await res.text());
   if(m&&m[1]!==SW_EXPECTED)setVerBadge(APP_VERSION+' \u2022 sul server: '+m[1].replace('maps-app-',''),'stale')}catch(e){}}
@@ -332,8 +332,8 @@ function renderShare(){
  const ag=$('#shareAgents'),rg=$('#shareRegions');if(!ag||!rg)return;
  const cntA={},cntR={};
  for(const c of Object.values(project.clients)){const a=agentOf(c)||'(senza agente)';cntA[a]=(cntA[a]||0)+1;const r=regionOf(provOf(c))||'(senza regione)';cntR[r]=(cntR[r]||0)+1}
- ag.innerHTML=Object.keys(cntA).sort().map(a=>`<label><input type="checkbox" data-ag="${escapeHtml(a)}"${shareSel.agents.has(a)?' checked':''}> ${escapeHtml(a)} <span class="muted">(${cntA[a]})</span></label>`).join('');
- rg.innerHTML=Object.keys(cntR).sort().map(r=>`<label><input type="checkbox" data-rg="${escapeHtml(r)}"${shareSel.regions.has(r)?' checked':''}> ${escapeHtml(r)} <span class="muted">(${cntR[r]})</span></label>`).join('');
+ ag.innerHTML=Object.keys(cntA).sort().map(a=>`<label class="multi-item"><input type="checkbox" data-ag="${escapeHtml(a)}"${shareSel.agents.has(a)?' checked':''}> ${escapeHtml(a)} <span class="count">${cntA[a]}</span></label>`).join('');
+ rg.innerHTML=Object.keys(cntR).sort().map(r=>`<label class="multi-item"><input type="checkbox" data-rg="${escapeHtml(r)}"${shareSel.regions.has(r)?' checked':''}> ${escapeHtml(r)} <span class="count">${cntR[r]}</span></label>`).join('');
  ag.querySelectorAll('input').forEach(i=>i.onchange=()=>{i.checked?shareSel.agents.add(i.dataset.ag):shareSel.agents.delete(i.dataset.ag);renderShare()});
  rg.querySelectorAll('input').forEach(i=>i.onchange=()=>{i.checked?shareSel.regions.add(i.dataset.rg):shareSel.regions.delete(i.dataset.rg);renderShare()});
  const n=shareClients().length;

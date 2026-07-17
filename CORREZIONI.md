@@ -611,3 +611,26 @@ ignorato, **l'importo alterato non passa** (16.990.143 € invariati), i clienti
 agenti intatti.
 
 sw.js: cache v14.0.
+
+## v14.1 — Elenchi del dialogo di export illeggibili
+
+Segnalazione con schermata: nella finestra "Esporta una parte del progetto" gli elenchi di
+agenti e regioni erano un blocco di testo continuo, con le caselle di spunta accanto
+all'etichetta sbagliata.
+
+**Causa.** L'app ha già un componente per gli elenchi a spunta (i filtri Regioni/Province):
+le voci usano `<label class="multi-item">`, ed è quella classe a renderle righe flex con la
+casella allineata e il conteggio a destra. Nel dialogo nuovo avevo scritto `<label>` nudo:
+senza la classe, le etichette restano in linea e vanno a capo dove capita.
+Inoltre la regola `.multi-list` che avevo aggiunto era generica e si sovrapponeva a quella
+originale dei filtri della barra laterale.
+
+**Correzione.** Le voci del dialogo usano ora lo stesso markup dei filtri già collaudati
+(`multi-item` + `count`), e la regola CSS è ristretta al solo dialogo (`.share-cols
+.multi-list`), lasciando intatti i filtri della barra laterale. I pulsantini "tutti /
+nessuno" non si allargano più (`flex:none`).
+
+Lezione: quando l'app ha già un componente per una cosa, riusare la sua classe invece di
+rifare il markup a mano.
+
+sw.js: cache v14.1.
