@@ -457,3 +457,46 @@ chiedere all'amministrazione di aggiungere **partita IVA e codice ATECO** all'ex
 clienti: con quelli la classificazione diventa automatica e ufficiale per tutti i 1.788.
 
 sw.js: cache v13.1.
+
+## v13.2 — Classifica rapida del tipo di attività ed export
+
+Segnalazione: filtrando "Officina / autoriparazione" comparivano LA NUOVA MECCANICA DI
+CAMIOLO e GARAGE EQUIPMENT ASSISTANCE, che sono **rivenditori**. Erano i suggerimenti
+automatici dal nome a inquinare il filtro, e correggerli si poteva solo aprendo la scheda
+di un cliente per volta: inutilizzabile su 1.788 clienti.
+
+### Priorità dei suggerimenti corretta
+Le parole che indicano commercio di attrezzature (EQUIPMENT, FORNITURE, RICAMBI,
+ATTREZZATURE, INGROSSO...) ora vincono su parole generiche come GARAGE o MECCANICA.
+Effetto: "GARAGE EQUIPMENT ASSISTANCE" viene suggerito come rivenditore, non come
+officina. "LA NUOVA MECCANICA DI CAMIOLO" resta insidioso — nessuna regola può saperlo —
+ed è esattamente il motivo per cui serve la correzione manuale.
+
+### Nuovo pannello "Tipo di attività"
+- Mostra a colpo d'occhio quanti clienti filtrati sono **impostati da te**, quanti hanno
+  un **suggerimento da confermare** e quanti sono **da classificare**.
+- **Classifica clienti**: finestra con l'elenco dei clienti filtrati, ordinati per storico,
+  con un menu a tendina per riga. La scelta si salva subito e vince su ogni suggerimento.
+  Ogni riga mostra città, storico e comportamento d'acquisto per decidere senza uscire.
+  Pulsanti "Solo da classificare" e "Accetta tutti i suggerimenti" (con conferma esplicita
+  che sono ipotesi dal nome).
+  Limite di 250 righe per volta, ordinate per storico: oltre, la finestra diventava pesante
+  (misurato: 1.788 righe = 2.474ms e 26.820 nodi; 250 righe = 324ms e 3.750 nodi). Si
+  restringe con i filtri di zona, che è poi il modo naturale di lavorare la lista.
+- **Esporta CSV clienti**: elenco completo dei clienti filtrati con TIPO ATTIVITA,
+  CLASSIFICATO DA (impostato / suggerito dal nome / da classificare), stato, comportamento
+  d'acquisto, n. macchine, anni della macchina, storico, ultimi 12 mesi, ordini, email,
+  telefono. Si apre in Excel.
+- L'export del progetto (JSON) contiene già il campo `bizType`: le classificazioni viaggiano
+  con il progetto e sopravvivono alla rigenerazione dai file Excel.
+
+### Bug trovato dai test
+La funzione dell'elenco usava `eur()` invece di `euro()`: sarebbe esplosa al primo clic su
+"Classifica clienti". Trovato eseguendo il codice reale contro il DOM in JSDOM, non a vista.
+
+### Clienti già classificati nel progetto
+Cinque rivenditori sono preimpostati: COMPANY SERVICE, SIRE e INDACO FORNITURE (verificati
+online sui codici ATECO), LA NUOVA MECCANICA DI CAMIOLO e GARAGE EQUIPMENT ASSISTANCE
+(indicati da A. Pezzali).
+
+sw.js: cache v13.2.

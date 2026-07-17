@@ -191,13 +191,13 @@ const DAY=86400000;
 
 function monthsSince(t){return t?Math.max(0,Math.round((REF_END-t)/(30.44*DAY))):null}
 
-const APP_VERSION='v13.1';
+const APP_VERSION='v13.2';
 function setVerBadge(txt,cls){const el=$('#verBadge');if(!el)return;el.textContent=txt;el.className='ver'+(cls?' '+cls:'')}
 function showUpdateBanner(){if($('#updBanner'))return;const d=document.createElement('div');d.id='updBanner';d.className='upd-banner';
  d.innerHTML=`<span>È disponibile una versione più recente di Maps APP.</span><button type="button" id="updNow">Aggiorna ora</button>`;
  document.body.appendChild(d);$('#updNow').onclick=async()=>{if('serviceWorker'in navigator){const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs)await r.unregister()}location.reload(true)};
  setVerBadge(APP_VERSION+' · aggiornamento pronto','stale')}
-const SW_EXPECTED='maps-app-v13-1-biztype';
+const SW_EXPECTED='maps-app-v13-2-classifica';
 async function checkVersion(){setVerBadge(APP_VERSION);
  try{const res=await fetch('sw.js?ts='+Date.now(),{cache:'no-store'});const m=/const CACHE='([^']+)'/.exec(await res.text());
   if(m&&m[1]!==SW_EXPECTED)setVerBadge(APP_VERSION+' \u2022 sul server: '+m[1].replace('maps-app-',''),'stale')}catch(e){}}
@@ -251,10 +251,14 @@ function lastMacDesc(c){const ev=clientType(c).ev;if(!ev.length)return'';const t
  return l?`${l.description||''} (${new Date(t).toLocaleDateString('it-IT')})`:''}
 const BIZ={officina:'Officina / autoriparazione',gommista:'Gommista / pneumatici',carrozzeria:'Carrozzeria',concessionaria:'Concessionaria / autosalone',rivenditore:'Rivenditore / distributore',trasporti:'Trasporti / noleggio',agente:'Agente / intermediario',altro:'Altro'};
 // Suggerimento dal nome: è solo un'ipotesi, va confermata dall'agente. Ordine = priorità.
-const BIZ_RX=[['gommista',/\bGOMM|PNEUMATIC|\bTYRE|GOMMIST/i],['carrozzeria',/CARROZZ/i],
- ['officina',/OFFICIN|AUTORIPARAZ|AUTOSERVIZ|\bGARAGE\b|MECCANIC|AUTOMECCANIC/i],
+// L'ordine conta: chi vende attrezzature vince su parole generiche come GARAGE o MECCANICA,
+// perché "GARAGE EQUIPMENT" e "X FORNITURE" sono rivenditori, non officine.
+const BIZ_RX=[
+ ['rivenditore',/RICAMB|FORNITUR|ATTREZZATUR|DISTRIBUZ|DISTRIBUT|INGROSSO|GROSSIST|\bUTENSIL|EQUIPMENT|\bCOMMERCIO\b/i],
+ ['carrozzeria',/CARROZZ/i],
+ ['gommista',/\bGOMM|PNEUMATIC|\bTYRE|GOMMIST/i],
  ['concessionaria',/CONCESSIONAR|AUTOSALON|\bMOTORS\b/i],
- ['rivenditore',/RICAMB|FORNITUR|ATTREZZATUR|DISTRIBUZ|DISTRIBUT|INGROSSO|GROSSIST|\bUTENSIL|EQUIPMENT/i],
+ ['officina',/OFFICIN|AUTORIPARAZ|AUTOSERVIZ|\bGARAGE\b|MECCANIC|AUTOMECCANIC/i],
  ['trasporti',/TRASPORT|AUTOTRASP|LOGISTIC|NOLEGG|\bRENT\b/i],
  ['agente',/\bAGENZIA\b|\bAGENTE\b|RAPPRESENT/i]];
 function guessBiz(c){const n=(c.name||'').toUpperCase();for(const[k,rx]of BIZ_RX)if(rx.test(n))return k;return ''}
@@ -272,6 +276,42 @@ function fillBizHint(c){const g=guessBiz(c),h=$('#detailBizHint'),b=$('#detailBi
  const fatti=[beh.label,a!=null?`ultima ${a.toFixed(1)} anni fa`:''].filter(Boolean).join(' \u00b7 ');
  h.innerHTML=(c.bizType?'Impostato da te.':(g?`Suggerimento dal nome: <b>${escapeHtml(BIZ[g])}</b> \u2014 da confermare, il nome pu\u00f2 ingannare.`:'Non deducibile dal nome: impostalo tu.'))+(fatti?` <span style="color:#6b7280">\u00b7 Acquisti: ${escapeHtml(fatti)}</span>`:'');
  if(b){b.hidden=!!c.bizType||!g;b.onclick=()=>{c.bizType=g;$('#detailBiz').value=g;save();fillBizHint(c)}}}
+
+function renderBizPanel(){const f=filtered();const set=f.filter(c=>bizOf(c)).length,gue=f.filter(c=>!bizOf(c)&&guessBiz(c)).length,no=f.length-set-gue;
+ const el=$('#bizCount');if(el)el.textContent=`(${f.length})`;
+ const i=$('#bizInfo');if(i)i.innerHTML=`<div class="mail-info"><b>${set}</b> impostati da te \u00b7 <b>${gue}</b> con suggerimento da confermare \u00b7 <b>${no}</b> da classificare</div>`}
+const BIZ_MAX=250;   // oltre, la finestra diventa pesante: si restringe con i filtri
+function bizRows(onlyTodo){const f=filtered().slice().sort((a,b)=>(b.sales||0)-(a.sales||0));
+ return onlyTodo?f.filter(c=>!bizOf(c)):f}
+let bizTodoOnly=false;
+function renderBizList(){const all=bizRows(bizTodoOnly),rows=all.slice(0,BIZ_MAX),box=$('#bizList');if(!box)return;
+ const opts=c=>Object.entries(BIZ).map(([k,v])=>`<option value="${k}"${bizOf(c)===k?' selected':''}>${escapeHtml(v)}</option>`).join('');
+ box.innerHTML=rows.length?rows.map(c=>{const g=guessBiz(c),b=bizOf(c);
+  return `<div class="biz-row"><div class="biz-name"><b>${escapeHtml(c.name||c.id)}</b><small>${escapeHtml([c.city,c.province].filter(Boolean).join(' '))} \u00b7 ${euro(c.sales||0)} \u00b7 ${escapeHtml(behaviorOf(c).label||'nessun acquisto')}</small></div>
+  <select class="biz-sel" data-id="${escapeHtml(c.id)}"><option value="">${g?'\u2014 suggerito: '+escapeHtml(BIZ[g])+' \u2014':'\u2014 da classificare \u2014'}</option>${opts(c)}</select>
+  <span class="biz-tag ${b?'ok':(g?'guess':'')}">${b?'impostato':(g?'da confermare':'')}</span></div>`}).join(''):'<p class="muted">Nessun cliente nella selezione.</p>';
+ box.querySelectorAll('.biz-sel').forEach(sel=>sel.onchange=()=>{const c=project.clients[sel.dataset.id];if(!c)return;
+  c.bizType=sel.value||'';save();renderBizList();renderBizPanel();render()});
+ const st=$('#bizStat');if(st)st.textContent=all.length>BIZ_MAX
+   ?`Mostrati i ${BIZ_MAX} di maggior storico su ${all.length}: restringi con i filtri (regione, provincia, stato) per lavorare gli altri.`
+   :`${all.length} clienti in elenco, ordinati per storico`}
+function acceptAllGuesses(){const rows=bizRows(false).filter(c=>!bizOf(c)&&guessBiz(c));
+ if(!rows.length){alert('Nessun suggerimento da applicare nella selezione attuale.');return}
+ if(!confirm(`Impostare il suggerimento dal nome su ${rows.length} clienti (tutti quelli filtrati, non solo quelli a schermo)?\n\nSono ipotesi ricavate dal nome: "GARAGE EQUIPMENT" o "LA NUOVA MECCANICA" possono essere rivenditori. Potrai correggere i singoli casi.`))return;
+ for(const c of rows)c.bizType=guessBiz(c);save();renderBizList();renderBizPanel();render()}
+function exportClientsCsv(){const f=filtered();
+ const head=['CODICE','RAGIONE SOCIALE','INDIRIZZO','CITTA','CAP','PROVINCIA','REGIONE','AGENTE','CLASSE ABC','TIPO ATTIVITA','CLASSIFICATO DA','STATO','DETTAGLIO STATO','ACQUISTI','N. MACCHINE','ANNI MACCHINA','ULTIMA MACCHINA','STORICO','ULTIMI 12 MESI','12 MESI PRECEDENTI','ORDINI APERTI','EMAIL','TELEFONO'];
+ const body=f.map(c=>{const w=WIN.get(c.id)||{},a=macAgeYears(c),b=bizOf(c),g=guessBiz(c);
+  return [c.id,c.name,c.address||'',c.city||'',c.cap||'',c.province||'',regionOf(provOf(c)),c.agent||'',c.abc||'',
+   b?BIZ[b]:(g?BIZ[g]:''),b?'impostato':(g?'suggerito dal nome':'da classificare'),
+   clientStatus(c).status||'',clientStatus(c).label||'',behaviorOf(c).label||'',behaviorOf(c).n||0,
+   a!=null?a.toFixed(1).replace('.',','):'',lastMacDesc(c),
+   Math.round(c.sales||0),Math.round(w.a||0),Math.round(w.b||0),Math.round(c.orders||0),
+   (c.emails||[]).join('; '),(c.phones||[]).join('; ')].map(csvCell).join(',')});
+ if(!f.length)return alert('Nessun cliente nella selezione attuale.');
+ const csv='\ufeff'+[head.map(csvCell).join(','),...body].join('\r\n');
+ download(`clienti_${new Date().toISOString().slice(0,10)}.csv`,csv);
+ $('#status').textContent=`Esportati ${f.length} clienti con il tipo di attività.`}
 function statusText(){const x=project.imports;return ['clienti','ordini','vendite'].map(k=>x[k]?`${k}: ${x[k].rows} righe`:`${k}: non importato`).join(' · ')}
 function selectedYears(){const from=num($('#yearFrom').value)||-Infinity,to=num($('#yearTo').value)||Infinity;return{from,to}}
 function lineYear(line){if(line.year)return num(line.year);const m=String(line.date||'').match(/(\d{4})$/);return m?num(m[1]):0}
@@ -286,7 +326,7 @@ function matchAge(c){const v=$('#ageFilter')?.value;if(!v)return true;const a=ma
  if(v==='lt3')return a<3; if(v==='lt5')return a<5; if(v==='ge5')return a>=5; if(v==='ge7')return a>=7; return true}
 function updateProductSuggestions(){const q=norm($('#productSearch').value).toLowerCase(),seen=new Map();for(const c of Object.values(project.clients))for(const x of [...(c.saleLines||[]),...(c.orderLines||[])]){const label=[x.article,x.description].filter(Boolean).join(' — ');if(label&&(!q||label.toLowerCase().includes(q)))seen.set(label,label)}$('#productSuggestions').innerHTML=[...seen.values()].slice(0,250).map(v=>`<option value="${escapeHtml(v)}"></option>`).join('')}
 function updateYears(){const years=new Set();for(const c of Object.values(project.clients))for(const x of [...(c.saleLines||[]),...(c.orderLines||[])]){const y=lineYear(x);if(y)years.add(y)}const vals=[...years].sort((a,b)=>b-a);for(const id of ['yearFrom','yearTo']){const el=$(`#${id}`),cur=el.value,label=id==='yearFrom'?'Da anno':'A anno';el.innerHTML=`<option value="">${label}</option>`+vals.map(y=>`<option value="${y}">${y}</option>`).join('');el.value=cur}}
-function render(){computeRefYear();const all=Object.values(project.clients),view=filtered();fillSelect('#agentFilter',[...new Set(all.map(c=>c.agent).filter(Boolean))]);{const sig=[...new Set(all.map(provOf).filter(Boolean))].sort().join(',')+'|'+[...geoSel.regions].join(',');if(sig!==_geoSig)renderGeoFilters(all);}updateYears();updateProductSuggestions();const visibleLines=view.flatMap(matchingLines);const filteredSales=visibleLines.filter(x=>x.kind==='sale').reduce((s,x)=>s+x.amount,0),filteredOrders=visibleLines.filter(x=>x.kind==='order').reduce((s,x)=>s+x.amount,0);$('#clientCount').textContent=view.length;$('#mappedCount').textContent=view.filter(c=>c.lat!=null).length;$('#ordersTotal').textContent=euro(hasTransactionFilter()?filteredOrders:view.reduce((s,c)=>s+c.orders,0));$('#salesTotal').textContent=euro(hasTransactionFilter()?filteredSales:view.reduce((s,c)=>s+c.sales,0));$('#status').textContent=statusText();renderList(view);renderMarkers(view);renderTour();renderMailPanel();renderStart();if($('#refInfo'))$('#refInfo').innerHTML=`Stato clienti calcolato su: ${escapeHtml(REF_LABEL)}. I clienti con ordini aperti non sono mai classificati dormienti.${hasClassData()?'':' <b style="color:#b45309">Per i filtri Tipo cliente ed Età macchina reimporta il file vendite.</b>'}`}
+function render(){computeRefYear();const all=Object.values(project.clients),view=filtered();fillSelect('#agentFilter',[...new Set(all.map(c=>c.agent).filter(Boolean))]);{const sig=[...new Set(all.map(provOf).filter(Boolean))].sort().join(',')+'|'+[...geoSel.regions].join(',');if(sig!==_geoSig)renderGeoFilters(all);}updateYears();updateProductSuggestions();const visibleLines=view.flatMap(matchingLines);const filteredSales=visibleLines.filter(x=>x.kind==='sale').reduce((s,x)=>s+x.amount,0),filteredOrders=visibleLines.filter(x=>x.kind==='order').reduce((s,x)=>s+x.amount,0);$('#clientCount').textContent=view.length;$('#mappedCount').textContent=view.filter(c=>c.lat!=null).length;$('#ordersTotal').textContent=euro(hasTransactionFilter()?filteredOrders:view.reduce((s,c)=>s+c.orders,0));$('#salesTotal').textContent=euro(hasTransactionFilter()?filteredSales:view.reduce((s,c)=>s+c.sales,0));$('#status').textContent=statusText();renderList(view);renderMarkers(view);renderTour();renderMailPanel();renderBizPanel();renderStart();if($('#refInfo'))$('#refInfo').innerHTML=`Stato clienti calcolato su: ${escapeHtml(REF_LABEL)}. I clienti con ordini aperti non sono mai classificati dormienti.${hasClassData()?'':' <b style="color:#b45309">Per i filtri Tipo cliente ed Età macchina reimporta il file vendite.</b>'}`}
 function fillSelect(sel,vals){const el=$(sel),cur=el.value,label=el.options[0].text;el.innerHTML=`<option value="">${label}</option>`+vals.sort().map(v=>`<option>${escapeHtml(v)}</option>`).join('');el.value=cur}
 function renderList(items){$('#list').innerHTML=items.slice(0,400).map(c=>{const st=clientStatus(c),inTour=project.tour?.includes(c.id),lines=matchingLines(c),fs=lines.filter(x=>x.kind==='sale').reduce((s,x)=>s+x.amount,0),fo=lines.filter(x=>x.kind==='order').reduce((s,x)=>s+x.amount,0);return `<article class="client" data-id="${c.id}"><h3>${escapeHtml(c.name||c.id)}</h3><p>${escapeHtml([c.city,c.province,c.agent].filter(Boolean).join(' · '))}</p><div class="badges">${(hasTransactionFilter()?fo:c.orders)?`<span class="badge order">Ordini ${euro(hasTransactionFilter()?fo:c.orders)}</span>`:''}${(hasTransactionFilter()?fs:c.sales)?`<span class="badge sales">Vendite ${euro(hasTransactionFilter()?fs:c.sales)}</span>`:''}${hasTransactionFilter()?`<span class="badge">${lines.length} righe prodotto</span>`:''}${st.label?`<span class="badge ${st.status==='calo'?'risk':'sleep'}">${escapeHtml(st.label)}</span>`:''}${c.lat==null?'<span class="badge missing">Da geocodificare</span>':''}<button type="button" class="mini tour-add${inTour?' on':''}" data-tour="${c.id}">${inTour?'✓ Giro':'+ Giro'}</button></div></article>`}).join('')+(items.length>400?`<p style="padding:8px;opacity:.7"><small>Elenco limitato a 400 di ${items.length} clienti (la mappa li mostra tutti). Usa i filtri per restringere.</small></p>`:'');document.querySelectorAll('.client').forEach(x=>x.onclick=()=>openDetail(x.dataset.id));document.querySelectorAll('.tour-add').forEach(b=>b.onclick=e=>{e.stopPropagation();toggleTour(b.dataset.tour)})}
 function renderMarkers(items){if(!markers||typeof L==='undefined')return;markers.clearLayers();for(const c of items){if(c.lat==null)continue;const st=clientStatus(c);const cls=st.status==='calo'?'risk':st.status==='dormiente'?'sleep':c.orders>0?'order':isTop(c)?'top':'';const icon=L.divIcon({className:'',html:`<div class="marker-dot ${cls}"></div>`,iconSize:[18,18],iconAnchor:[9,9]});const m=L.marker([c.lat,c.lng],{icon,draggable:true}).addTo(markers).bindTooltip(c.name||c.id);m.on('click',()=>openDetail(c.id));m.on('dragend',e=>{const p=e.target.getLatLng();c.lat=p.lat;c.lng=p.lng;c.manualPosition=true;save()})}}
@@ -297,7 +337,12 @@ async function geocodeMissing(){const list=filtered().filter(c=>c.lat==null&&c.a
 function exportProject(){const blob=new Blob([JSON.stringify(project,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`maps-app-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href)}
 function fit(){if(!map)return alert('La mappa richiede una connessione Internet.');const pts=filtered().filter(c=>c.lat!=null).map(c=>[c.lat,c.lng]);if(pts.length)map.fitBounds(pts,{padding:[30,30]})}
 function escapeHtml(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
-$('#excelInput').onchange=e=>importFiles([...e.target.files]);$('#projectInput').onchange=async e=>{try{const p=JSON.parse(await e.target.files[0].text());if(!p.clients)throw 0;project=p;await save();fit()}catch{alert('Progetto non valido')}};$('#exportBtn').onclick=exportProject;$('#fitBtn').onclick=fit;$('#geocodeBtn').onclick=geocodeMissing;$('#tourAddFiltered').onclick=tourAddFiltered;$('#tourClear').onclick=()=>{project.tour=[];invalidateRoute();save()};$('#tourOptimize').onclick=optimizeTour;$('#startGps').onclick=setStartGps;$('#startAddr').onchange=setStartAddr;$('#mailExport').onclick=exportMail;$('#mailCopy').onclick=copyMail;$('#mailManage').onclick=()=>{renderMailDialog();$('#mailDialog').showModal()};$('#mailClose').onclick=()=>$('#mailDialog').close();$('#mailAll').onclick=()=>mailBulk('all');$('#mailNone').onclick=()=>mailBulk('none');$('#mailNoPec').onclick=()=>mailBulk('nopec');['costConsumo','costPrezzo','costPedaggio','costQuota'].forEach(id=>{$('#'+id).onchange=()=>{project.costParams??={consumo:7,prezzo:1.90,pedaggio:0.095,quota:60};project.costParams.consumo=Number($('#costConsumo').value)||7;project.costParams.prezzo=Number($('#costPrezzo').value)||1.90;project.costParams.pedaggio=Number($('#costPedaggio').value)||0.095;project.costParams.quota=Math.min(100,Math.max(0,Number($('#costQuota').value)||0));save()}});['search','productSearch','agentFilter','statusFilter','typeFilter','behaviorFilter','ageFilter','movementFilter','yearFrom','yearTo','onlyOrders','onlySales','onlyMissing'].forEach(id=>$(`#${id}`).addEventListener(['search','productSearch'].includes(id)?'input':'change',render));const isStandalone=()=>window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+$('#excelInput').onchange=e=>importFiles([...e.target.files]);$('#projectInput').onchange=async e=>{try{const p=JSON.parse(await e.target.files[0].text());if(!p.clients)throw 0;project=p;await save();fit()}catch{alert('Progetto non valido')}};$('#exportBtn').onclick=exportProject;$('#fitBtn').onclick=fit;$('#geocodeBtn').onclick=geocodeMissing;$('#tourAddFiltered').onclick=tourAddFiltered;$('#tourClear').onclick=()=>{project.tour=[];invalidateRoute();save()};$('#tourOptimize').onclick=optimizeTour;$('#startGps').onclick=setStartGps;$('#startAddr').onchange=setStartAddr;$('#mailExport').onclick=exportMail;
+$('#bizManage').onclick=()=>{bizTodoOnly=false;renderBizList();$('#bizDialog').showModal()};
+$('#bizClose').onclick=()=>$('#bizDialog').close();
+$('#bizOnlyTodo').onclick=()=>{bizTodoOnly=!bizTodoOnly;$('#bizOnlyTodo').classList.toggle('primary',bizTodoOnly);renderBizList()};
+$('#bizAcceptAll').onclick=acceptAllGuesses;
+$('#bizExport').onclick=exportClientsCsv;$('#mailCopy').onclick=copyMail;$('#mailManage').onclick=()=>{renderMailDialog();$('#mailDialog').showModal()};$('#mailClose').onclick=()=>$('#mailDialog').close();$('#mailAll').onclick=()=>mailBulk('all');$('#mailNone').onclick=()=>mailBulk('none');$('#mailNoPec').onclick=()=>mailBulk('nopec');['costConsumo','costPrezzo','costPedaggio','costQuota'].forEach(id=>{$('#'+id).onchange=()=>{project.costParams??={consumo:7,prezzo:1.90,pedaggio:0.095,quota:60};project.costParams.consumo=Number($('#costConsumo').value)||7;project.costParams.prezzo=Number($('#costPrezzo').value)||1.90;project.costParams.pedaggio=Number($('#costPedaggio').value)||0.095;project.costParams.quota=Math.min(100,Math.max(0,Number($('#costQuota').value)||0));save()}});['search','productSearch','agentFilter','statusFilter','typeFilter','behaviorFilter','ageFilter','movementFilter','yearFrom','yearTo','onlyOrders','onlySales','onlyMissing'].forEach(id=>$(`#${id}`).addEventListener(['search','productSearch'].includes(id)?'input':'change',render));const isStandalone=()=>window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
 const isIOS=()=>/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;$('#installBtn').hidden=false});
 window.addEventListener('appinstalled',()=>{deferredPrompt=null;$('#installBtn').hidden=true});

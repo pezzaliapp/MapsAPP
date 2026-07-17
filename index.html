@@ -125,6 +125,14 @@
       <small>“Ottimizza” ordina le tappe partendo dalla tua posizione (se autorizzi il GPS) e genera i link di navigazione Google Maps. Le tappe su Sardegna e Sicilia formano sezioni separate (serve traghetto/volo): il percorso non le collega mai via terra. Km stradali reali via OSRM; costi: carburante e pedaggi (tariffa media classe A, autostrade sarde/siciliane in gran parte gratuite quindi escluse). Prezzi aggiornabili nei campi qui sopra.</small>
     </section>
 
+    <section class="panel" id="bizPanel">
+      <h2 style="margin:0 0 8px;font-size:16px">Tipo di attività <span id="bizCount"></span></h2>
+      <div id="bizInfo"></div>
+      <div class="row"><button id="bizManage" class="primary">Classifica clienti</button></div>
+      <div class="row"><button id="bizExport">Esporta CSV clienti</button></div>
+      <small>Il gestionale non dice che mestiere fa il cliente: lo imposti tu, e resta salvato nel progetto. In "Classifica clienti" li correggi in blocco sui <b>clienti filtrati</b>. Il CSV esporta l'elenco con la categoria, e l'export del progetto (JSON) la porta con sé.</small>
+    </section>
+
     <section class="panel" id="mailPanel">
       <h2 style="margin:0 0 8px;font-size:16px">Mailing list <span id="mailCount"></span></h2>
       <div id="mailInfo"></div>
@@ -146,6 +154,18 @@
   </aside>
   <div id="map"></div>
 </main>
+<dialog id="bizDialog"><div class="dialog-card">
+  <button class="close" id="bizClose" type="button">&times;</button>
+  <h2 style="margin:0 0 4px;font-size:20px">Classifica i clienti filtrati</h2>
+  <p style="margin:0 0 10px;color:#6b7280;font-size:13px">Scegli il mestiere di ogni cliente: la scelta è salvata subito nel progetto e vince su qualsiasi suggerimento. I nomi ingannano — <b>LA NUOVA MECCANICA</b> e <b>GARAGE EQUIPMENT</b> sembrano officine ma sono rivenditori: qui li correggi.</p>
+  <div class="row" style="margin:0 0 8px;flex-wrap:wrap">
+    <button id="bizOnlyTodo" type="button" title="Mostra solo i clienti non ancora classificati">Solo da classificare</button>
+    <button id="bizAcceptAll" type="button" title="Imposta il suggerimento dal nome su tutti quelli non ancora classificati che ne hanno uno">Accetta tutti i suggerimenti</button>
+    <span id="bizStat" class="muted" style="align-self:center;font-size:12px"></span>
+  </div>
+  <div id="bizList" style="max-height:52vh;overflow:auto"></div>
+</div></dialog>
+
 <dialog id="mailDialog"><div class="dialog-card">
   <button class="close" id="mailClose" type="button">&times;</button>
   <h2 style="margin:0 0 4px;font-size:20px">Indirizzi email dei clienti filtrati</h2>
