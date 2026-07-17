@@ -30,6 +30,10 @@
         <button id="exportBtn">Esporta progetto</button>
         <label class="button">Apri progetto<input id="projectInput" type="file" accept=".json" hidden></label>
       </div>
+      <div class="row" style="margin-top:8px">
+        <button id="shareBtn">Esporta per agente/regione</button>
+        <label class="button" title="Unisce le classificazioni fatte da un agente senza toccare il resto">Unisci progetto<input id="mergeInput" type="file" accept=".json" hidden></label>
+      </div>
       <small id="status">Nessun dato importato.</small><small>Nota: il file clienti contiene indirizzi ma non coordinate. Dopo l’importazione usa <b>Geocodifica mancanti</b> per creare i marker.</small>
     </section>
 
@@ -154,6 +158,24 @@
   </aside>
   <div id="map"></div>
 </main>
+<dialog id="shareDialog"><div class="dialog-card">
+  <button class="close" id="shareClose" type="button">&times;</button>
+  <h2 style="margin:0 0 4px;font-size:20px">Esporta una parte del progetto</h2>
+  <p style="margin:0 0 10px;color:#6b7280;font-size:13px">Scegli agenti e regioni: esporti un progetto con i soli clienti selezionati, da mandare all'agente di zona. Lui lo apre con <b>Apri progetto</b>, lavora le sue schede e te lo rimanda: con <b>Unisci progetto</b> riporti qui le sue correzioni senza toccare il resto. Se non spunti nulla in un elenco, vale come "tutti".</p>
+  <div class="share-cols">
+    <div>
+      <div class="row" style="margin:0 0 6px"><b style="font-size:13px">Agenti</b><button id="shareAgAll" type="button" class="mini">tutti</button><button id="shareAgNone" type="button" class="mini">nessuno</button></div>
+      <div class="multi-list" id="shareAgents" style="max-height:32vh"></div>
+    </div>
+    <div>
+      <div class="row" style="margin:0 0 6px"><b style="font-size:13px">Regioni</b><button id="shareRegAll" type="button" class="mini">tutte</button><button id="shareRegNone" type="button" class="mini">nessuna</button></div>
+      <div class="multi-list" id="shareRegions" style="max-height:32vh"></div>
+    </div>
+  </div>
+  <p id="shareStat" style="margin:10px 0 0;font-weight:700"></p>
+  <div class="row" style="margin-top:8px"><button id="shareExport" class="primary">Esporta il progetto parziale</button></div>
+</div></dialog>
+
 <dialog id="bizDialog"><div class="dialog-card">
   <button class="close" id="bizClose" type="button">&times;</button>
   <h2 style="margin:0 0 4px;font-size:20px">Classifica i clienti filtrati</h2>

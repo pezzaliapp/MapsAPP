@@ -195,13 +195,13 @@ const DAY=86400000;
 
 function monthsSince(t){return t?Math.max(0,Math.round((REF_END-t)/(30.44*DAY))):null}
 
-const APP_VERSION='v13.4';
+const APP_VERSION='v14.0';
 function setVerBadge(txt,cls){const el=$('#verBadge');if(!el)return;el.textContent=txt;el.className='ver'+(cls?' '+cls:'')}
 function showUpdateBanner(){if($('#updBanner'))return;const d=document.createElement('div');d.id='updBanner';d.className='upd-banner';
  d.innerHTML=`<span>È disponibile una versione più recente di Maps APP.</span><button type="button" id="updNow">Aggiorna ora</button>`;
  document.body.appendChild(d);$('#updNow').onclick=async()=>{if('serviceWorker'in navigator){const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs)await r.unregister()}location.reload(true)};
  setVerBadge(APP_VERSION+' · aggiornamento pronto','stale')}
-const SW_EXPECTED='maps-app-v13-4-agente';
+const SW_EXPECTED='maps-app-v14-0-condivisione';
 async function checkVersion(){setVerBadge(APP_VERSION);
  try{const res=await fetch('sw.js?ts='+Date.now(),{cache:'no-store'});const m=/const CACHE='([^']+)'/.exec(await res.text());
   if(m&&m[1]!==SW_EXPECTED)setVerBadge(APP_VERSION+' \u2022 sul server: '+m[1].replace('maps-app-',''),'stale')}catch(e){}}
@@ -321,6 +321,62 @@ function exportClientsCsv(){const f=filtered();
  $('#status').textContent=`Esportati ${f.length} clienti con il tipo di attività.`}
 function agentOf(c){return norm(c.agentOverride)||norm(c.agent)||''}
 function agentList(){return [...new Set(Object.values(project.clients).map(agentOf).filter(Boolean))].sort()}
+
+// ---------- Export parziale per agente/regione e unione dei rientri ----------
+const shareSel={agents:new Set(),regions:new Set()};
+// Campi che l'agente lavora sul suo file e che vanno riportati indietro.
+// Le vendite, gli ordini e l'anagrafica NON si toccano: quelli vengono dal gestionale.
+const MERGE_FIELDS=[['bizType','tipo di attività'],['agentOverride','agente corretto'],['note','note'],['lat','coordinate'],['lng','coordinate'],['manualPosition','posizione manuale']];
+function shareRegionsAvailable(){return [...new Set(Object.values(project.clients).map(c=>regionOf(provOf(c))).filter(Boolean))].sort()}
+function renderShare(){
+ const ag=$('#shareAgents'),rg=$('#shareRegions');if(!ag||!rg)return;
+ const cntA={},cntR={};
+ for(const c of Object.values(project.clients)){const a=agentOf(c)||'(senza agente)';cntA[a]=(cntA[a]||0)+1;const r=regionOf(provOf(c))||'(senza regione)';cntR[r]=(cntR[r]||0)+1}
+ ag.innerHTML=Object.keys(cntA).sort().map(a=>`<label><input type="checkbox" data-ag="${escapeHtml(a)}"${shareSel.agents.has(a)?' checked':''}> ${escapeHtml(a)} <span class="muted">(${cntA[a]})</span></label>`).join('');
+ rg.innerHTML=Object.keys(cntR).sort().map(r=>`<label><input type="checkbox" data-rg="${escapeHtml(r)}"${shareSel.regions.has(r)?' checked':''}> ${escapeHtml(r)} <span class="muted">(${cntR[r]})</span></label>`).join('');
+ ag.querySelectorAll('input').forEach(i=>i.onchange=()=>{i.checked?shareSel.agents.add(i.dataset.ag):shareSel.agents.delete(i.dataset.ag);renderShare()});
+ rg.querySelectorAll('input').forEach(i=>i.onchange=()=>{i.checked?shareSel.regions.add(i.dataset.rg):shareSel.regions.delete(i.dataset.rg);renderShare()});
+ const n=shareClients().length;
+ $('#shareStat').textContent=`${n} clienti nella selezione`+(n?'':' — non c\u2019\u00e8 nulla da esportare');
+ $('#shareExport').disabled=!n}
+function shareClients(){return Object.values(project.clients).filter(c=>{
+ const a=agentOf(c)||'(senza agente)',r=regionOf(provOf(c))||'(senza regione)';
+ return (!shareSel.agents.size||shareSel.agents.has(a))&&(!shareSel.regions.size||shareSel.regions.has(r))})}
+function exportShare(){const cs=shareClients();if(!cs.length)return;
+ const ids=new Set(cs.map(c=>c.id));
+ const sub={...project,
+  clients:Object.fromEntries(cs.map(c=>[c.id,c])),
+  tour:(project.tour||[]).filter(i=>ids.has(i)),
+  emailsOff:(project.emailsOff||[]).filter(k=>ids.has(String(k).split('|')[0])),
+  subset:{agents:[...shareSel.agents],regions:[...shareSel.regions],clients:cs.length,date:new Date().toISOString(),from:'Maps APP '+APP_VERSION}};
+ const nome=[...shareSel.agents,...shareSel.regions].join('-').replace(/[^\w\-]+/g,'_').slice(0,40)||'selezione';
+ download(`maps-app_${nome}_${new Date().toISOString().slice(0,10)}.json`,JSON.stringify(sub,null,2));
+ $('#status').textContent=`Esportati ${cs.length} clienti. L'agente lo apre con "Apri progetto"; al rientro usa "Unisci progetto".`}
+function mergeProject(p){
+ if(!p||!p.clients)return alert('File non valido: non sembra un progetto Maps APP.');
+ const cambi=[],ignoti=[];let tocchi=0;
+ for(const [id,inc] of Object.entries(p.clients)){
+  const cur=project.clients[id];
+  if(!cur){ignoti.push(inc.name||id);continue}
+  const diff=[];
+  for(const [f,lab] of MERGE_FIELDS){
+   const a=inc[f]??'',b=cur[f]??'';
+   if(String(a)!==String(b)&&!(f==='lat'||f==='lng'?!inc.manualPosition:false)){if(!diff.includes(lab))diff.push(lab)}}
+  if(diff.length){cambi.push({id,name:cur.name,diff});tocchi++}}
+ if(!tocchi&&!ignoti.length)return alert('Nessuna differenza: il file non contiene correzioni nuove.');
+ const righe=cambi.slice(0,12).map(c=>`\u2022 ${c.name}: ${c.diff.join(', ')}`).join('\n');
+ const testo=`Il file contiene ${Object.keys(p.clients).length} clienti`+(p.subset?` (${[...(p.subset.agents||[]),...(p.subset.regions||[])].join(', ')||'selezione'}, esportato il ${new Date(p.subset.date).toLocaleDateString('it-IT')})`:'')+`.\n\n`+
+  `Correzioni da riportare: ${tocchi} clienti\n${righe}${cambi.length>12?`\n\u2026e altri ${cambi.length-12}`:''}\n\n`+
+  (ignoti.length?`${ignoti.length} clienti del file non esistono qui e verranno ignorati.\n\n`:'')+
+  `Vendite, ordini e anagrafica NON vengono toccati: arrivano dal gestionale.\n\nProcedo?`;
+ if(!confirm(testo))return;
+ for(const c of cambi){const inc=p.clients[c.id],cur=project.clients[c.id];
+  for(const [f] of MERGE_FIELDS){if(f==='lat'||f==='lng'){if(inc.manualPosition)cur[f]=inc[f]}else cur[f]=inc[f]??''}}
+ // esclusioni email: valgono le scelte dell'agente sui SUOI clienti
+ const idsFile=new Set(Object.keys(p.clients));
+ project.emailsOff=[...(project.emailsOff||[]).filter(k=>!idsFile.has(String(k).split('|')[0])),...(p.emailsOff||[])];
+ save();render();
+ alert(`Fatto: ${tocchi} clienti aggiornati.`+(ignoti.length?`\n${ignoti.length} ignorati perch\u00e9 non presenti nel progetto.`:''))}
 function statusText(){const x=project.imports;return ['clienti','ordini','vendite'].map(k=>x[k]?`${k}: ${x[k].rows} righe`:`${k}: non importato`).join(' · ')}
 function selectedYears(){const from=num($('#yearFrom').value)||-Infinity,to=num($('#yearTo').value)||Infinity;return{from,to}}
 function lineYear(line){if(line.year)return num(line.year);const m=String(line.date||'').match(/(\d{4})$/);return m?num(m[1]):0}
@@ -354,7 +410,19 @@ async function geocodeMissing(){const list=filtered().filter(c=>c.lat==null&&c.a
 function exportProject(){const blob=new Blob([JSON.stringify(project,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`maps-app-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href)}
 function fit(){if(!map)return alert('La mappa richiede una connessione Internet.');const pts=filtered().filter(c=>c.lat!=null).map(c=>[c.lat,c.lng]);if(pts.length)map.fitBounds(pts,{padding:[30,30]})}
 function escapeHtml(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
-$('#excelInput').onchange=e=>importFiles([...e.target.files]);$('#projectInput').onchange=async e=>{try{const p=JSON.parse(await e.target.files[0].text());if(!p.clients)throw 0;project=p;await save();fit()}catch{alert('Progetto non valido')}};$('#exportBtn').onclick=exportProject;$('#fitBtn').onclick=fit;$('#geocodeBtn').onclick=geocodeMissing;$('#tourAddFiltered').onclick=tourAddFiltered;$('#tourClear').onclick=()=>{project.tour=[];invalidateRoute();save()};$('#tourOptimize').onclick=optimizeTour;$('#startGps').onclick=setStartGps;$('#startAddr').onchange=setStartAddr;$('#mailExport').onclick=exportMail;
+$('#excelInput').onchange=e=>importFiles([...e.target.files]);$('#projectInput').onchange=async e=>{try{const p=JSON.parse(await e.target.files[0].text());if(!p.clients)throw 0;
+ const n=Object.keys(p.clients).length,cur=Object.keys(project.clients||{}).length;
+ if(p.subset&&cur>n){const chi=[...(p.subset.agents||[]),...(p.subset.regions||[])].join(', ')||'selezione';
+  if(!confirm(`Attenzione: questo \u00e8 un progetto PARZIALE (${n} clienti \u2014 ${chi}).\n\nAprendolo sostituisci il progetto che hai adesso, che ne contiene ${cur}: gli altri ${cur-n} spariscono da questo dispositivo.\n\nSe volevi solo riportare le correzioni dell'agente, annulla e usa "Unisci progetto".\n\nAprire lo stesso?`)){e.target.value='';return}}
+ project=p;await save();fit()}catch{alert('Progetto non valido')}finally{e.target.value=''}};$('#exportBtn').onclick=exportProject;
+$('#shareBtn').onclick=()=>{renderShare();$('#shareDialog').showModal()};
+$('#shareClose').onclick=()=>$('#shareDialog').close();
+$('#shareExport').onclick=()=>{exportShare();$('#shareDialog').close()};
+$('#shareAgAll').onclick=()=>{shareSel.agents=new Set(Object.values(project.clients).map(c=>agentOf(c)||'(senza agente)'));renderShare()};
+$('#shareAgNone').onclick=()=>{shareSel.agents.clear();renderShare()};
+$('#shareRegAll').onclick=()=>{shareSel.regions=new Set(Object.values(project.clients).map(c=>regionOf(provOf(c))||'(senza regione)'));renderShare()};
+$('#shareRegNone').onclick=()=>{shareSel.regions.clear();renderShare()};
+$('#mergeInput').onchange=async e=>{try{const p=JSON.parse(await e.target.files[0].text());mergeProject(p)}catch(err){alert('File non leggibile: '+err.message)}finally{e.target.value=''}};$('#fitBtn').onclick=fit;$('#geocodeBtn').onclick=geocodeMissing;$('#tourAddFiltered').onclick=tourAddFiltered;$('#tourClear').onclick=()=>{project.tour=[];invalidateRoute();save()};$('#tourOptimize').onclick=optimizeTour;$('#startGps').onclick=setStartGps;$('#startAddr').onchange=setStartAddr;$('#mailExport').onclick=exportMail;
 $('#bizManage').onclick=()=>{bizTodoOnly=false;renderBizList();$('#bizDialog').showModal()};
 $('#bizClose').onclick=()=>$('#bizDialog').close();
 $('#bizOnlyTodo').onclick=()=>{bizTodoOnly=!bizTodoOnly;$('#bizOnlyTodo').classList.toggle('primary',bizTodoOnly);renderBizList()};

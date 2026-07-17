@@ -572,3 +572,42 @@ canali interni; 777=RIENTRO e 888=FINANZ./LOCAZ. sono codici tecnici. I codici 0
 o corretti a mano dalla scheda.
 
 sw.js: cache v13.4.
+
+## v14.0 — Condivisione del lavoro fra agenti: export parziale e unione
+
+Serviva un modo per far lavorare i quattro agenti sulle proprie zone senza che ognuno
+tenesse un file scollegato dagli altri.
+
+### Esporta per agente/regione
+Nuovo pulsante **Esporta per agente/regione**: due elenchi a spunta (agenti e regioni, con
+il numero di clienti accanto a ciascuno) e il conteggio della selezione aggiornato in
+tempo reale. Nessuna spunta in un elenco = "tutti". Il file esportato è un progetto vero e
+proprio, apribile con "Apri progetto": contiene i clienti selezionati con vendite, ordini,
+classi merceologiche, coordinate ed esclusioni email, più un blocco `subset` che registra
+chi/cosa/quando è stato esportato. Il nome del file lo dichiara: `maps-app_PEZZALI_2026-07-17.json`.
+
+### Unisci progetto
+Nuovo pulsante **Unisci progetto**: riporta nel progetto principale il lavoro fatto
+dall'agente sul suo file, **senza toccare il resto**. Vengono uniti solo i campi che
+l'agente lavora: tipo di attività, agente corretto, note, coordinate impostate a mano.
+Vendite, ordini e anagrafica non si toccano mai: arrivano dal gestionale.
+Prima di procedere mostra un riepilogo — quanti clienti, da chi e di quando è il file,
+l'elenco delle correzioni cliente per cliente, quanti clienti del file non esistono nel
+progetto (ignorati) — e chiede conferma.
+Le esclusioni email dell'agente valgono per i suoi clienti, così le sue scelte non vengono
+sovrascritte né sovrascrivono quelle degli altri.
+
+### Rete di sicurezza sull'apertura
+Aprire un file parziale con "Apri progetto" sostituirebbe l'intero progetto: se il file ha
+meno clienti di quello attuale ed è marcato come parziale, ora compare un avviso esplicito
+("gli altri 1.590 spariscono da questo dispositivo") e il suggerimento di usare "Unisci
+progetto".
+
+### Verifica del ciclo completo
+Test che simula il giro reale: esporto i 198 clienti di PEZZALI, l'agente modifica tipi di
+attività, note, agente e coordinate, aggiunge un cliente inesistente e altera un importo di
+vendita, poi si uniscono i rientri. Risultato: 5 correzioni riportate, il cliente inventato
+ignorato, **l'importo alterato non passa** (16.990.143 € invariati), i clienti degli altri
+agenti intatti.
+
+sw.js: cache v14.0.
