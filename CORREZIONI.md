@@ -212,3 +212,43 @@ funzionante e si rispettino le richieste di cancellazione. Per i prospect mai
 attivati serve invece un consenso raccolto.
 
 sw.js: cache v11.
+
+## v12 — Correzione classificazione clienti (bug dormienti)
+
+### Bug segnalato: dormienti con ordini aperti
+`clientStatus()` classificava dormiente qualunque cliente con storico e zero vendite
+nell'anno di riferimento, **senza guardare il portafoglio ordini**. Un cliente con un
+ordine in corso non è dormiente: è attivo, in attesa di consegna.
+→ Ora un cliente con ordini aperti non è mai classificato dormiente.
+
+### Bug più grave emerso durante l'analisi: anno di riferimento parziale
+REF_YEAR era l'anno più recente presente nei dati, cioè l'**anno in corso** (2026),
+completo solo per metà. Conseguenze sui dati reali (1.788 clienti, export 17/07/2026):
+- 82 clienti che avevano acquistato negli ultimi 12 mesi (ma non nel 2026 solare)
+  risultavano "dormienti": 347.000 € di vendite negli ultimi 12 mesi trattate come
+  clientela persa;
+- 43 clienti risultavano "in calo" solo perché 6 mesi di 2026 venivano confrontati
+  con 12 mesi di 2025;
+- 21 cali veri restavano invece nascosti.
+
+→ La classificazione usa ora **finestre mobili di 12 mesi** calcolate sulle date reali
+delle righe di vendita (già presenti nei dati importati): ultimi 12 mesi vs 12 mesi
+precedenti, confronto omogeneo. La data di riferimento è l'ultima data presente nei
+dati (mostrata in interfaccia: "Stato clienti calcolato su: 12 mesi al gg/mm/aaaa").
+Le date future (errori di digitazione) non spostano la finestra.
+
+Definizioni aggiornate:
+- **Dormiente**: ha storico, zero acquisti negli ultimi 12 mesi, nessun ordine aperto.
+  L'etichetta ora indica l'anzianità reale ("Dormiente da 21 mesi").
+- **In calo**: ultimi 12 mesi sotto il 60% dei 12 precedenti ("In calo -75% (12 mesi)").
+- **Attivo**: acquisti negli ultimi 12 mesi oppure ordini aperti.
+
+Effetto sui dati reali: dormienti 658 → 572, in calo 62 → 40, attivi 139 → 247.
+
+### Compatibilità e prestazioni
+- Progetti vecchi senza date nelle righe: fallback sull'ultimo anno **completo**
+  (mai sull'anno in corso parziale), quindi nessuna regressione.
+- Il ricalcolo delle finestre (16.387 righe) è in cache: si esegue solo quando i dati
+  cambiano, non a ogni digitazione nei filtri (24ms → 0,2ms per ridisegno).
+
+sw.js: cache v12.
