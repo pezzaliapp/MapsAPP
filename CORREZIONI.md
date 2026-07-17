@@ -319,3 +319,43 @@ Perdita dei clienti in calo: 851.882 € negli ultimi 12 mesi.
 Prestazioni invariate: ricalcolo 42ms una tantum, 0,15ms per ridisegno con cache.
 
 sw.js: cache v12.1.
+
+## v12.2 — Il calo tiene conto degli ordini in corso
+
+Domanda emersa in revisione: la percentuale di calo considerava solo il **consegnato**
+(cioè il fatturato), ignorando il portafoglio ordini. Un cliente con una consegna in
+ritardo ma un ordine importante in corso risultava "in calo" pur non avendo smesso
+di comprare.
+
+Verifica sui dati reali: dei clienti segnalati in calo, 8 avevano ordini aperti per
+79.050 €. Le righe d'ordine aperte sono quasi tutte recentissime (105 su 153 negli
+ultimi 3 mesi, 147 su 153 entro 6 mesi, una sola oltre i 12 mesi): sono domanda
+attuale, non ordini fermi.
+
+→ Il calo continua a confrontare il **consegnato** (unico dato disponibile in serie
+storica), ma **somma gli ordini in corso al periodo attuale**, assegnandoli alla
+finestra in base alla data di creazione dell'ordine. L'etichetta lo dichiara:
+"In calo -46% (ultimi 6 mesi, ordini inclusi)".
+
+Falsi allarmi eliminati sui dati reali:
+- D.CAR di FORMICONI: consegnato 16.504 € vs 36.507 € (-55%) + 23.370 € in ordine
+  → 109% del periodo precedente: **non è in calo**;
+- BISSA di BISSA ABELE: 82.909 € vs 125.623 € + 11.850 € in ordine → 75%: non in calo;
+- IL RE DELLE GOMME e CENTRO ARIA COMPRESSA: idem.
+Cali confermati anche contando gli ordini: ECOPROGRAM FLOTTE (-65%), EFFEGI SYSTEMS
+(-96%), O.M.Z. (-46%), GABRIELE UTENSILI (-44%), QUALITY SERVICE (-98%).
+
+Nota metodologica onesta: il confronto è asimmetrico, perché il periodo attuale
+include il portafoglio ordini mentre quello precedente contiene solo consegnato
+(il gestionale non fornisce lo storico degli ordini acquisiti, solo l'inevaso di oggi).
+L'asimmetria è voluta e prudente: evita di dichiarare "in calo" un cliente che sta
+ancora ordinando.
+
+Corretto anche un difetto nella costruzione dell'etichetta (parentesi non chiusa nel
+caso di progetti senza date nelle righe).
+
+### Effetto sui dati reali
+In calo 50 → **47** · Ordini aperti 37 → **40** · Dormienti 572 · Top 15 · Altri 1.114.
+Perdita dei clienti in calo: 798.842 € negli ultimi 12 mesi.
+
+sw.js: cache v12.2.

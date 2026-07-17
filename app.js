@@ -189,17 +189,21 @@ const DAY=86400000;
 
 function monthsSince(t){return t?Math.max(0,Math.round((REF_END-t)/(30.44*DAY))):null}
 
-const APP_VERSION='v12.1';
+const APP_VERSION='v12.2';
 function setVerBadge(txt,cls){const el=$('#verBadge');if(!el)return;el.textContent=txt;el.className='ver'+(cls?' '+cls:'')}
 function showUpdateBanner(){if($('#updBanner'))return;const d=document.createElement('div');d.id='updBanner';d.className='upd-banner';
  d.innerHTML=`<span>È disponibile una versione più recente di Maps APP.</span><button type="button" id="updNow">Aggiorna ora</button>`;
  document.body.appendChild(d);$('#updNow').onclick=async()=>{if('serviceWorker'in navigator){const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs)await r.unregister()}location.reload(true)};
  setVerBadge(APP_VERSION+' · aggiornamento pronto','stale')}
-const SW_EXPECTED='maps-app-v12-1-trend-fix';
+const SW_EXPECTED='maps-app-v12-2-orders-in-trend';
 async function checkVersion(){setVerBadge(APP_VERSION);
  try{const res=await fetch('sw.js?ts='+Date.now(),{cache:'no-store'});const m=/const CACHE='([^']+)'/.exec(await res.text());
   if(m&&m[1]!==SW_EXPECTED)setVerBadge(APP_VERSION+' \u2022 sul server: '+m[1].replace('maps-app-',''),'stale')}catch(e){}}
 const TOP_12M=20000,CALO_RATIO=0.6,CALO_MIN=3000;
+
+function monthsSince(t){return t?Math.max(0,Math.round((REF_END-t)/(30.44*DAY))):null}
+
+function isTop(c){const w=WIN.get(c.id);return (w?w.a:0)>=TOP_12M}
 function computeRefYear(force){const sig=`${Object.keys(project.clients).length}|${project.updatedAt||''}`;if(!force&&sig===STATS_SIG&&WIN.size)return;STATS_SIG=sig;
 let y=0,maxT=0;const all=Object.values(project.clients);
 for(const c of all){for(const k of Object.keys(c.saleYears||{})){const n=num(k);if(n>y)y=n}for(const l of c.saleLines||[]){const t=parseDMY(l.date);if(t&&t>maxT&&t<=Date.now()+DAY)maxT=t}}
@@ -210,17 +214,26 @@ for(const c of all){let a=0,b=0,a6=0,b6=0,last=0,dated=false;
 for(const l of c.saleLines||[]){const t=parseDMY(l.date);if(!t)continue;dated=true;if(t>last)last=t;const v=num(l.amount);
  if(t>w1)a+=v;else if(t>w2)b+=v;
  if(t>h1)a6+=v;else if(t>h2&&t<=h3)b6+=v}
-WIN.set(c.id,{a,b,a6,b6,last,dated})}
+// portafoglio ordini aperto = domanda del periodo corrente, assegnata per data di creazione
+let oa=0,oa6=0;
+for(const l of c.orderLines||[]){const v=num(l.amount);const t=parseDMY(l.date);
+ if(!t){oa+=v;oa6+=v;continue}
+ if(t>w1)oa+=v;
+ if(t>h1)oa6+=v}
+WIN.set(c.id,{a,b,a6,b6,oa,oa6,last,dated})}
 REF_LABEL=maxT?`12 mesi al ${new Date(REF_END).toLocaleDateString('it-IT')}`:`anno ${REF_YEAR}`}
 function monthsSince(t){return t?Math.max(0,Math.round((REF_END-t)/(30.44*DAY))):null}
+function caloLabel(pct,parts){const p=parts.filter(Boolean);return `In calo ${Math.round(pct)}%${p.length?` (${p.join(', ')})`:''}`}
 function clientStatus(c){const w=WIN.get(c.id);const hasOpen=(c.orders||0)>0;const sales=c.sales||0;
-let cur,prev,dated=!!(w&&w.dated);
+let cur,prev,dated=!!(w&&w.dated);const oa=w?w.oa:0,oa6=w?w.oa6:0;
 if(dated){cur=w.a;prev=w.b}
 else{const thisYear=new Date().getUTCFullYear();const ref=REF_YEAR>=thisYear?REF_YEAR-1:REF_YEAR;if(!ref)return{status:'',label:''};
  cur=(c.saleYears?.[ref]||0)+(REF_YEAR>=thisYear?(c.saleYears?.[REF_YEAR]||0):0);prev=c.saleYears?.[ref-1]||0}
 if(sales>0&&cur===0&&!hasOpen){const m=dated?monthsSince(w.last):null;return{status:'dormiente',label:m?`Dormiente da ${m} mesi`:'Dormiente'}}
-if(dated&&w.b6>=CALO_MIN&&w.a6<w.b6*CALO_RATIO){const p=Math.round((w.a6-w.b6)/w.b6*100);return{status:'calo',label:`In calo ${p}% (ultimi 6 mesi)`}}
-if(prev>=CALO_MIN&&cur<prev*CALO_RATIO)return{status:'calo',label:`In calo ${Math.round((cur-prev)/prev*100)}%${dated?' (12 mesi)':''}`};
+// il calo confronta il consegnato, ma somma gli ordini in corso al periodo attuale:
+// un cliente con ordini in portafoglio non sta abbandonando, la consegna deve ancora avvenire
+if(dated&&w.b6>=CALO_MIN&&(w.a6+oa6)<w.b6*CALO_RATIO)return{status:'calo',label:caloLabel(((w.a6+oa6)-w.b6)/w.b6*100,['ultimi 6 mesi',oa6>0&&'ordini inclusi'])};
+if(prev>=CALO_MIN&&(cur+oa)<prev*CALO_RATIO)return{status:'calo',label:caloLabel(((cur+oa)-prev)/prev*100,[dated&&'12 mesi',oa>0&&'ordini inclusi'])};
 if(sales>0||hasOpen)return{status:'attivo',label:''};
 return{status:'',label:''}}
 function isTop(c){const w=WIN.get(c.id);return (w?w.a:0)>=TOP_12M}
