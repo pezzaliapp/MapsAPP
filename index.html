@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#111827">
 <title>Maps APP</title>
-<link rel="manifest" href="manifest.webmanifest?v=14-16">
+<link rel="manifest" href="manifest.webmanifest?v=14-15">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Maps APP">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="style.css?v=14-16">
+<link rel="stylesheet" href="style.css?v=14-15">
 </head>
 <body>
 <header>
@@ -106,8 +106,8 @@
       <div class="row" style="margin-top:10px"><button id="resetAppBtn" class="ghost-danger">Ripristina app (forza aggiornamento)</button></div>
       <small>Se l'app resta bloccata su una versione vecchia: svuota la cache del programma e ricarica l'ultima versione dal sito. I tuoi dati NON vengono toccati (restano nel salvataggio locale); fai comunque prima "Esporta progetto".</small>
       <small id="refInfo" class="muted"></small>
-      <small class="muted">In calo = consegnato sotto il 60% del periodo precedente, su 12 mesi <b>oppure</b> su 6 mesi (vs gli stessi 6 mesi dell'anno prima). Gli <b>ordini in corso vengono sommati al periodo attuale</b>: chi ha ordini in portafoglio non è in calo, la consegna deve ancora avvenire. Verde (in crescita) = quest'anno ha acquistato almeno 5.000 € e almeno il 10% (e 3.000 €) in più rispetto allo stesso periodo dell'anno scorso.</small>
-      <small>Marker: <b style="color:#dc2626">rosso</b>=in calo · <b style="color:#9ca3af">grigio</b>=dormiente · <b style="color:#f97316">arancio</b>=ordini aperti · <b style="color:#16a34a">verde</b>=in crescita · <b style="color:#3b82f6">blu</b>=altri · <b style="color:#7c3aed">viola</b>=finanziaria/leasing</small>
+      <small class="muted">In calo = consegnato sotto il 60% del periodo precedente, su 12 mesi <b>oppure</b> su 6 mesi (vs gli stessi 6 mesi dell'anno prima). Gli <b>ordini in corso vengono sommati al periodo attuale</b>: chi ha ordini in portafoglio non è in calo, la consegna deve ancora avvenire. Top = almeno 20.000 € consegnati negli ultimi 12 mesi.</small>
+      <small>Marker: <b style="color:#dc2626">rosso</b>=in calo · <b style="color:#9ca3af">grigio</b>=dormiente · <b style="color:#f97316">arancio</b>=ordini aperti · <b style="color:#16a34a">verde</b>=top (≥20k in 12 mesi) · <b style="color:#3b82f6">blu</b>=altri</small>
     </section>
 
     <section class="panel" id="tourPanel">
@@ -238,6 +238,6 @@
 </dialog>
 <script src="vendor/jszip.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="app.js?v=14-16"></script>
+<script src="app.js?v=14-15"></script>
 </body>
 </html>

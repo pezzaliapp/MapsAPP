@@ -1051,34 +1051,3 @@ Windows memorizza l'identità al momento dell'installazione: disinstalla dalla f
 chrome://apps), Ctrl+Maiusc+R sul sito, poi reinstalla. Da lì il titolo sarà corretto.
 
 sw.js: cache v14.15.
-
-## v14.16 — Marker verde = "in crescita"; società di leasing in viola
-
-Due richieste collegate, nate da un dubbio giusto: perché SEMERARO era verde pur non avendo
-acquistato nel 2026?
-
-### Bug del verde (top)
-`isTop` usava "≥20.000 € consegnati negli ultimi 12 mesi", con la finestra 12 mesi che finisce
-all'ultima vendita del database (17/07/2026), non a oggi. SEMERARO aveva 56.792 € tra ago e ott
-2025 → dentro la finestra → verde, pur essendo fermo da 9 mesi. Fuorviante.
-
-**Nuova definizione (richiesta da A. Pezzali): verde = cliente IN CRESCITA.**
-Confronto anno solare corrente vs anno precedente, a pari data (1 gen → oggi):
-- ha acquistato almeno 5.000 € quest'anno, E
-- crescita di almeno 3.000 € E almeno +10% rispetto allo stesso periodo dell'anno scorso.
-- clienti ripartiti da zero (anno prima 0 €) diventano verdi se quest'anno ≥ 3.000 €.
-Verificato: SEMERARO non è più verde (0 € nel 2026); ZAMMARCHI resta verde (23.412 vs 14.359,
-+63%). Sui dati reali risultano 52 clienti in crescita.
-
-### Società di leasing / noleggio / finanziarie
-BCC RENT & LEASE, ALBA LEASING, EUROCONSULT non sono clienti finali ma finanziarie: gonfiavano
-le classifiche (BCC ha 482k di storico). 
-- Nuovo tipo attività "Finanziaria / Leasing / Noleggio".
-- Nuovo colore marker VIOLA dedicato.
-- `isFin(c)`: true se bizType='finanziaria' OPPURE il nome contiene LEASING/NOLEGG/RENT/RENTAL/
-  FACTOR/LOCAZION. Queste sono sempre viola, mai verde né in calo/dormiente, ed escluse dalle
-  classifiche.
-- Le tre note sono forzate a "finanziaria" in rigenera.py (correzione esplicita che vince sulla
-  classificazione precedente); le altre classificazioni dell'utente restano intatte.
-
-Legenda aggiornata di conseguenza. sw.js: cache v14.16.
