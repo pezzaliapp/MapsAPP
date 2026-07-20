@@ -809,3 +809,28 @@ Test: verificata la creazione reale del marker — draggable segue la modalità,
 scheda solo a modalità spenta, il drag chiede conferma e l'annullamento non modifica nulla.
 
 sw.js: cache v14.6.
+
+## v14.7 — Il pulsante "Installa" resta anche dopo l'installazione
+
+Segnalazione: dopo aver installato l'app, il pulsante "Installa" rimane visibile. Una volta
+installata dovrebbe sparire, ed eventualmente comparire "Disinstalla".
+
+**Causa.** Il pulsante veniva mostrato con `if(!isStandalone())`, condizione vera ogni volta
+che si usa l'app nel browser — anche dopo averla installata (perché continui a tenerla aperta
+anche in una scheda del browser). L'evento `appinstalled` lo nascondeva solo per quella
+sessione: a pagina ricaricata, ricompariva.
+
+**Correzione.** Lo stato del pulsante è ora ricalcolato a ogni evento rilevante da una sola
+funzione:
+- app aperta come finestra installata (standalone) → mostra **Disinstalla**, con le istruzioni
+  per Chrome/Edge, Android e iPhone;
+- app nel browser e installabile davvero (prompt disponibile, o iOS non ancora installata) →
+  mostra **Installa**;
+- app nel browser ma già installata, o non installabile → **nessun pulsante**.
+Quando cambia il display-mode (installi o disinstalli) la UI si riallinea da sola.
+
+Test: sei scenari verificati (browser installabile, appena installata, finestra installata,
+browser già installata, iPhone Safari, iPhone da schermata Home) — il pulsante mostra
+Installa / Disinstalla / nulla come atteso in ciascuno.
+
+sw.js: cache v14.7.

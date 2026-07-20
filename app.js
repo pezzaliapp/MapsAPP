@@ -213,13 +213,13 @@ const DAY=86400000;
 
 function monthsSince(t){return t?Math.max(0,Math.round((REF_END-t)/(30.44*DAY))):null}
 
-const APP_VERSION='v14.6';
+const APP_VERSION='v14.7';
 function setVerBadge(txt,cls){const el=$('#verBadge');if(!el)return;el.textContent=txt;el.className='ver'+(cls?' '+cls:'')}
 function showUpdateBanner(){if($('#updBanner'))return;const d=document.createElement('div');d.id='updBanner';d.className='upd-banner';
  d.innerHTML=`<span>È disponibile una versione più recente di Maps APP.</span><button type="button" id="updNow">Aggiorna ora</button>`;
  document.body.appendChild(d);$('#updNow').onclick=async()=>{if('serviceWorker'in navigator){const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs)await r.unregister()}location.reload(true)};
  setVerBadge(APP_VERSION+' · aggiornamento pronto','stale')}
-const SW_EXPECTED='maps-app-v14-6-marker-fissi';
+const SW_EXPECTED='maps-app-v14-7-install-btn';
 async function checkVersion(){setVerBadge(APP_VERSION);
  try{const res=await fetch('sw.js?ts='+Date.now(),{cache:'no-store'});const m=/const CACHE='([^']+)'/.exec(await res.text());
   if(m&&m[1]!==SW_EXPECTED)setVerBadge(APP_VERSION+' \u2022 sul server: '+m[1].replace('maps-app-',''),'stale')}catch(e){}}
@@ -552,11 +552,28 @@ $('#bizOnlyTodo').onclick=()=>{bizTodoOnly=!bizTodoOnly;$('#bizOnlyTodo').classL
 $('#bizAcceptAll').onclick=acceptAllGuesses;
 $('#bizExport').onclick=exportClientsCsv;$('#mailCopy').onclick=copyMail;$('#mailManage').onclick=()=>{renderMailDialog();$('#mailDialog').showModal()};$('#mailClose').onclick=()=>$('#mailDialog').close();$('#mailAll').onclick=()=>mailBulk('all');$('#mailNone').onclick=()=>mailBulk('none');$('#mailNoPec').onclick=()=>mailBulk('nopec');['costConsumo','costPrezzo','costPedaggio','costQuota'].forEach(id=>{$('#'+id).onchange=()=>{project.costParams??={consumo:7,prezzo:1.90,pedaggio:0.095,quota:60};project.costParams.consumo=Number($('#costConsumo').value)||7;project.costParams.prezzo=Number($('#costPrezzo').value)||1.90;project.costParams.pedaggio=Number($('#costPedaggio').value)||0.095;project.costParams.quota=Math.min(100,Math.max(0,Number($('#costQuota').value)||0));save()}});['search','productSearch','agentFilter','statusFilter','typeFilter','behaviorFilter','ageFilter','movementFilter','yearFrom','yearTo','onlyOrders','onlySales','onlyMissing'].forEach(id=>$(`#${id}`).addEventListener(['search','productSearch'].includes(id)?'input':'change',render));const isStandalone=()=>window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
 const isIOS=()=>/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;$('#installBtn').hidden=false});
-window.addEventListener('appinstalled',()=>{deferredPrompt=null;$('#installBtn').hidden=true});
-if(!isStandalone())$('#installBtn').hidden=false;
+// Stato del pulsante installa/disinstalla, ricalcolato a ogni evento rilevante.
+// - App aperta come finestra installata (standalone): mostro "Disinstalla" (istruzioni).
+// - App nel browser e installabile: mostro "Installa".
+// - App nel browser ma già installata (o non installabile): nascondo tutto.
+let installed=false;
+function refreshInstallUI(){const b=$('#installBtn');if(!b)return;
+  if(isStandalone()){b.hidden=false;b.textContent='Disinstalla';b.dataset.mode='uninstall';return}
+  if(deferredPrompt&&!installed){b.hidden=false;b.textContent='Installa';b.dataset.mode='install';return}
+  if(installed){b.hidden=true;return}          // già installata: niente pulsante nel browser
+  // iOS non emette beforeinstallprompt: se non è standalone, offro comunque le istruzioni
+  if(isIOS()&&!isStandalone()){b.hidden=false;b.textContent='Installa';b.dataset.mode='install';return}
+  b.hidden=true}
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;installed=false;refreshInstallUI()});
+window.addEventListener('appinstalled',()=>{deferredPrompt=null;installed=true;refreshInstallUI()});
+// se l'utente disinstalla e torna nel browser, display-mode cambia: riallineo
+window.matchMedia('(display-mode: standalone)').addEventListener?.('change',refreshInstallUI);
+refreshInstallUI();
 $('#installBtn').onclick=async()=>{
-  if(deferredPrompt){deferredPrompt.prompt();const{outcome}=await deferredPrompt.userChoice;deferredPrompt=null;if(outcome==='accepted')$('#installBtn').hidden=true;return}
+  if($('#installBtn').dataset.mode==='uninstall'){
+    alert('Per disinstallare Maps APP:\n\n• Chrome/Edge (desktop): apri l’app, menu ⋮ in alto a destra → “Disinstalla Maps APP”. Oppure da chrome://apps, tasto destro sull’icona → Rimuovi.\n• Android: tieni premuta l’icona sulla schermata Home → Disinstalla (o Rimuovi).\n• iPhone/iPad: tieni premuta l’icona sulla schermata Home → Rimuovi app → Elimina.');
+    return}
+  if(deferredPrompt){deferredPrompt.prompt();const{outcome}=await deferredPrompt.userChoice;deferredPrompt=null;if(outcome==='accepted')installed=true;refreshInstallUI();return}
   if(isIOS()){alert('Per installare su iPhone/iPad:\n\n1. Apri questa pagina in Safari\n2. Tocca il pulsante Condividi (quadrato con freccia)\n3. Scorri e tocca “Aggiungi a schermata Home”\n4. Conferma con “Aggiungi”');return}
   alert('Per installare l’app:\n\n• Chrome/Edge: menu ⋮ → “Installa Maps APP” (o icona di installazione nella barra degli indirizzi)\n• Firefox: non supporta l’installazione PWA su desktop\n\nNota: serve HTTPS (o localhost). Se la voce non compare, ricarica la pagina e riprova.')};
 (async()=>{await load();initMap();render();if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').then(reg=>{
