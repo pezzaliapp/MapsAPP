@@ -980,3 +980,28 @@ Se non basta: F12 → Application → "Clear site data", poi ricaricare. Dalla v
 problema non si ripresenta perché ogni versione ha URL diversi.
 
 sw.js: cache v14.12.
+
+## v14.13 — Installazione su PC: manifest ripulito e guida visiva
+
+Segnalazione: su PC Windows il pulsante "Installa" non installa; su Mac e iPhone ok.
+
+**Possibile causa mia.** Nella v14.11 avevo aggiunto `related_applications` al manifest (per
+rilevare l'app già installata). Quella voce, con `"platform":"webapp"`, su alcune versioni di
+Chrome desktop può interferire con l'offerta di installazione. L'ho rimossa: il manifest è
+tornato standard e pienamente installabile.
+
+**Realtà da conoscere.** Su Chrome/Edge desktop il pulsante in pagina può avviare
+l'installazione solo se il browser ha emesso il suo evento di installabilità, cosa che NON
+avviene se l'app è già installata o se il browser è in pausa dopo alcuni annullamenti. Il
+canale sempre affidabile su desktop è l'icona di installazione nella barra degli indirizzi.
+
+**Correzioni.**
+- Rimosso `related_applications` dal manifest (e il rilevamento `getInstalledRelatedApps` che
+  ne dipendeva).
+- Quando il prompt nativo non è disponibile, il pulsante ora apre una **guida visiva** che
+  mostra dove si trova l'icona di installazione nella barra degli indirizzi, con i passaggi
+  per Chrome ed Edge e la nota che, se l'icona non c'è, l'app è probabilmente già installata
+  (menu Start, chrome://apps, edge://apps).
+- Quando invece il prompt nativo è disponibile, il pulsante installa direttamente come prima.
+
+sw.js: cache v14.13.

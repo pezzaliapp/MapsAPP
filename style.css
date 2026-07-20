@@ -89,3 +89,10 @@ label input{margin-top:3px}
 /* v14.10: pulsante di ripristino app */
 .ghost-danger{background:#fff;color:#b91c1c;border:1px solid #fecaca}
 .ghost-danger:hover{background:#fef2f2}
+
+/* v14.13: guida visiva installazione */
+.install-hint{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px}
+.install-hint-bar{display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #cbd5e1;border-radius:999px;padding:6px 12px}
+.ih-url{color:#475569;font-size:13px}
+.ih-icon{font-size:18px;background:#dbeafe;border-radius:6px;padding:0 6px}
+.install-hint-arrow{text-align:right;color:#2563eb;font-size:12px;margin-top:6px;padding-right:8px}

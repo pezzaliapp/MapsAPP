@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#111827">
 <title>Maps APP</title>
-<link rel="manifest" href="manifest.webmanifest?v=14-12">
+<link rel="manifest" href="manifest.webmanifest?v=14-13">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Maps APP">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="style.css?v=14-12">
+<link rel="stylesheet" href="style.css?v=14-13">
 </head>
 <body>
 <header>
@@ -215,6 +215,21 @@
   <div id="mailList" style="max-height:52vh;overflow:auto"></div>
 </div></dialog>
 
+<dialog id="installGuide"><div class="dialog-card">
+  <button class="close" id="installGuideClose" type="button">&times;</button>
+  <h2 style="margin:0 0 6px;font-size:20px">Installare Maps APP su computer</h2>
+  <p style="margin:0 0 12px;color:#374151;font-size:14px">Su Chrome ed Edge il modo sicuro è l'icona di installazione <b>nella barra degli indirizzi</b>, in alto, all'estremità destra del campo dove c'è scritto l'indirizzo del sito.</p>
+  <div class="install-hint">
+    <div class="install-hint-bar"><span class="ih-url">alessandropezzali.it/MapsAPP/</span><span class="ih-icon" title="icona di installazione">⊕⃣</span></div>
+    <div class="install-hint-arrow">↑ è qui: un monitor con una freccia (Chrome) o un ⊕ (Edge)</div>
+  </div>
+  <ol style="margin:12px 0 0;padding-left:20px;font-size:14px;color:#374151;line-height:1.7">
+    <li>Clicca quell'icona → <b>Installa</b>.</li>
+    <li>In alternativa: menu <b>⋮</b> in alto a destra → <b>Installa Maps APP</b> (a volte sotto “App”).</li>
+    <li>Se non trovi né l'icona né la voce, l'app è <b>già installata</b>: cercala nel menu Start, o apri <b>chrome://apps</b> / <b>edge://apps</b>.</li>
+  </ol>
+</div></dialog>
+
 <dialog id="detailDialog">
   <form method="dialog" class="dialog-card">
     <button class="close" value="cancel" aria-label="Chiudi">×</button>
@@ -223,6 +238,6 @@
 </dialog>
 <script src="vendor/jszip.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="app.js?v=14-12"></script>
+<script src="app.js?v=14-13"></script>
 </body>
 </html>

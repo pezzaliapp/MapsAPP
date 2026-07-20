@@ -34,12 +34,5 @@
       "type": "image/svg+xml",
       "purpose": "any"
     }
-  ],
-  "related_applications": [
-    {
-      "platform": "webapp",
-      "url": "https://www.alessandropezzali.it/MapsAPP/manifest.webmanifest"
-    }
-  ],
-  "prefer_related_applications": false
+  ]
 }

@@ -213,7 +213,7 @@ const DAY=86400000;
 
 function monthsSince(t){return t?Math.max(0,Math.round((REF_END-t)/(30.44*DAY))):null}
 
-const APP_VERSION='v14.12';
+const APP_VERSION='v14.13';
 function setVerBadge(txt,cls){const el=$('#verBadge');if(!el)return;el.textContent=txt;el.className='ver'+(cls?' '+cls:'')}
 function showUpdateBanner(){updatePending=true;refreshInstallUI();if($('#updBanner'))return;const d=document.createElement('div');d.id='updBanner';d.className='upd-banner';
  d.innerHTML=`<span>È disponibile una versione più recente di Maps APP.</span><button type="button" id="updNow">Aggiorna ora</button>`;
@@ -222,7 +222,7 @@ function showUpdateBanner(){updatePending=true;refreshInstallUI();if($('#updBann
    if('serviceWorker'in navigator){const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs)await r.unregister()}}catch(e){}
   // ricarico su un URL con bypass della cache HTTP, altrimenti il browser rispolvera i file vecchi
   location.replace(location.pathname+'?fresh='+Date.now())};}
-const SW_EXPECTED='maps-app-v14-12-rel';
+const SW_EXPECTED='maps-app-v14-13-rel';
 async function checkVersion(){setVerBadge(APP_VERSION);
  try{const res=await fetch('sw.js?ts='+Date.now(),{cache:'no-store'});const m=/const CACHE='([^']+)'/.exec(await res.text());
   if(m&&m[1]!==SW_EXPECTED){setVerBadge(APP_VERSION+' \u2022 disponibile: '+m[1].replace('maps-app-',''),'stale');showUpdateBanner()}}catch(e){}}
@@ -490,6 +490,7 @@ async function hardResetApp(){
   if('serviceWorker'in navigator){const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs)await r.unregister()}}catch(e){}
  // ricarico bypassando ogni cache
  location.href=location.pathname+'?fresh='+Date.now()}
+function showInstallGuide(){const d=$('#installGuide');if(d&&d.showModal){d.showModal()}else{alert('Per installare: usa l\u2019icona di installazione nella barra degli indirizzi (in alto a destra nel campo dell\u2019indirizzo), oppure menu \u22ee \u2192 Installa Maps APP.')}}
 function statusText(){const x=project.imports;return ['clienti','ordini','vendite'].map(k=>x[k]?`${k}: ${x[k].rows} righe`:`${k}: non importato`).join(' · ')}
 function selectedYears(){const from=num($('#yearFrom').value)||-Infinity,to=num($('#yearTo').value)||Infinity;return{from,to}}
 function lineYear(line){if(line.year)return num(line.year);const m=String(line.date||'').match(/(\d{4})$/);return m?num(m[1]):0}
@@ -543,6 +544,7 @@ $('#excelInput').onchange=e=>importFiles([...e.target.files]);$('#projectInput')
   if(!confirm(`Attenzione: questo \u00e8 un progetto PARZIALE (${n} clienti \u2014 ${chi}).\n\nAprendolo sostituisci il progetto che hai adesso, che ne contiene ${cur}: gli altri ${cur-n} spariscono da questo dispositivo.\n\nSe volevi solo riportare le correzioni dell'agente, annulla e usa "Unisci progetto".\n\nAprire lo stesso?`)){e.target.value='';return}}
  project=p;migrateAgentBase();await save();fit()}catch{alert('Progetto non valido')}finally{e.target.value=''}};$('#exportBtn').onclick=exportProject;
 $('#resetAppBtn')&&($('#resetAppBtn').onclick=hardResetApp);
+$('#installGuideClose')&&($('#installGuideClose').onclick=()=>$('#installGuide').close());
 $('#prodAdd').onclick=addProd;
 $('#productSearch').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addProd()}});
 $('#prodAll').onchange=render;
@@ -581,20 +583,16 @@ window.addEventListener('appinstalled',()=>{deferredPrompt=null;installed=true;r
 // se l'utente disinstalla e torna nel browser, display-mode cambia: riallineo
 window.matchMedia('(display-mode: standalone)').addEventListener?.('change',refreshInstallUI);
 refreshInstallUI();
-// se il browser sa che l'app è già installata su questo dispositivo, tratto come installata
-(async()=>{try{if(navigator.getInstalledRelatedApps){const apps=await navigator.getInstalledRelatedApps();if(apps&&apps.length){installed=true;refreshInstallUI()}}}catch(e){}})();
+
 $('#installBtn').onclick=async()=>{
   if($('#installBtn').dataset.mode==='uninstall'){
     alert('Per disinstallare Maps APP:\n\n• Chrome/Edge (desktop): apri l’app, menu ⋮ in alto a destra → “Disinstalla Maps APP”. Oppure da chrome://apps, tasto destro sull’icona → Rimuovi.\n• Android: tieni premuta l’icona sulla schermata Home → Disinstalla (o Rimuovi).\n• iPhone/iPad: tieni premuta l’icona sulla schermata Home → Rimuovi app → Elimina.');
     return}
   if(deferredPrompt){try{deferredPrompt.prompt();const{outcome}=await deferredPrompt.userChoice;deferredPrompt=null;if(outcome==='accepted'){installed=true}refreshInstallUI();}catch(e){deferredPrompt=null;alert('La finestra di installazione non si è aperta. Usa l’icona di installazione nella barra degli indirizzi (a destra, un monitor con una freccia), oppure il menu ⋮ → “Installa Maps APP”.')}return}
   if(isIOS()){alert('Per installare su iPhone/iPad:\n\n1. Apri questa pagina in Safari\n2. Tocca il pulsante Condividi (quadrato con freccia)\n3. Scorri e tocca “Aggiungi a schermata Home”\n4. Conferma con “Aggiungi”');return}
-  // Nessun prompt disponibile: quasi sempre l'app è GIÀ installata su questo PC, oppure Chrome
-  // è in pausa dopo qualche annullamento. Verifico se risulta installata.
-  let giaInstallata=false;
-  try{if(navigator.getInstalledRelatedApps){const apps=await navigator.getInstalledRelatedApps();giaInstallata=apps&&apps.length>0}}catch(e){}
-  if(giaInstallata){alert('Maps APP risulta GIÀ installata su questo computer.\n\nAprila dal menu Start (cerca “Maps APP”) o da chrome://apps.\n\nSe vuoi reinstallarla: chrome://apps → tasto destro su Maps APP → Rimuovi, poi ricarica questa pagina e reinstalla.');refreshInstallUI();return}
-  alert('Per installare Maps APP su Windows (Chrome/Edge):\n\n1. Guarda a DESTRA nella barra degli indirizzi: c’è una piccola icona di installazione (un monitor con una freccia in giù). Cliccala → Installa.\n2. In alternativa: menu ⋮ in alto a destra → “Installa Maps APP” (o “App” → “Installa questo sito come app”).\n\nSe non trovi né l’icona né la voce, l’app è probabilmente già installata: cercala nel menu Start o in chrome://apps.\n\n(Firefox desktop non supporta l’installazione.)')};
+  // Nessun prompt disponibile (già installata, oppure Chrome in pausa dopo annullamenti):
+  // mostro la guida visiva all'icona nella barra degli indirizzi, che è sempre affidabile.
+  if(isIOS())return; showInstallGuide()};
 (async()=>{await load();initMap();render();if('serviceWorker'in navigator){let reloaded=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloaded)return;reloaded=true;location.reload()});}
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js?v='+SW_EXPECTED).then(reg=>{setInterval(()=>reg.update().catch(()=>{}),60000);
  reg.addEventListener('updatefound',()=>{const w=reg.installing;if(!w)return;w.addEventListener('statechange',()=>{if(w.state==='installed'&&navigator.serviceWorker.controller)showUpdateBanner()})});
