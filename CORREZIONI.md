@@ -923,3 +923,29 @@ alternativa, disinstalla da edge://apps o chrome://apps e reinstalla. Dalla v14.
 basta il pulsante "Ripristina app".
 
 sw.js: cache v14.10.
+
+## v14.11 — "Installa" su Windows non installava
+
+Segnalazione: su Windows (Chrome), cliccando "Installa" non succede nulla.
+
+**Perché.** Il pulsante custom "Installa" può avviare l'installazione solo se il browser ha
+prima emesso l'evento `beforeinstallprompt` (salvato in `deferredPrompt`). Su Chrome desktop
+quell'evento NON viene emesso in due casi molto comuni: l'app è già installata su quel PC, o
+Chrome è in pausa dopo che il prompt è stato annullato alcune volte. In quei casi il clic
+cadeva su un avviso generico poco utile.
+
+**Correzioni.**
+- Se l'app risulta **già installata** (via `navigator.getInstalledRelatedApps`), il pulsante
+  "Installa" non viene più mostrato nel browser, e se lo si forza il messaggio dice
+  chiaramente che è già installata e come aprirla/reinstallarla.
+- Quando non c'è il prompt, l'avviso ora è specifico per Windows: usare l'**icona di
+  installazione nella barra degli indirizzi** (il monitor con freccia in giù) o menu ⋮ →
+  "Installa Maps APP", con la nota che se non compaiono l'app è probabilmente già installata.
+- Il prompt nativo è avvolto in try/catch: se non si apre, indica l'icona nella barra.
+- `manifest.webmanifest`: aggiunto `related_applications` (l'app dichiarata verso sé stessa)
+  così `getInstalledRelatedApps` può riconoscere l'installazione su Windows.
+
+Nota: su Chrome desktop il modo più affidabile di installare resta l'icona nella barra degli
+indirizzi; il pulsante in pagina è una comodità aggiuntiva, non l'unico canale.
+
+sw.js: cache v14.11.
