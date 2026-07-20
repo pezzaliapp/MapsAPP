@@ -213,7 +213,7 @@ const DAY=86400000;
 
 function monthsSince(t){return t?Math.max(0,Math.round((REF_END-t)/(30.44*DAY))):null}
 
-const APP_VERSION='v14.16';
+const APP_VERSION='v14.15';
 function setVerBadge(txt,cls){const el=$('#verBadge');if(!el)return;el.textContent=txt;el.className='ver'+(cls?' '+cls:'')}
 function showUpdateBanner(){updatePending=true;refreshInstallUI();if($('#updBanner'))return;const d=document.createElement('div');d.id='updBanner';d.className='upd-banner';
  d.innerHTML=`<span>È disponibile una versione più recente di Maps APP.</span><button type="button" id="updNow">Aggiorna ora</button>`;
@@ -222,42 +222,36 @@ function showUpdateBanner(){updatePending=true;refreshInstallUI();if($('#updBann
    if('serviceWorker'in navigator){const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs)await r.unregister()}}catch(e){}
   // ricarico su un URL con bypass della cache HTTP, altrimenti il browser rispolvera i file vecchi
   location.replace(location.pathname+'?fresh='+Date.now())};}
-const SW_EXPECTED='maps-app-v14-16-rel';
+const SW_EXPECTED='maps-app-v14-15-rel';
 async function checkVersion(){setVerBadge(APP_VERSION);
  try{const res=await fetch('sw.js?ts='+Date.now(),{cache:'no-store'});const m=/const CACHE='([^']+)'/.exec(await res.text());
   if(m&&m[1]!==SW_EXPECTED){setVerBadge(APP_VERSION+' \u2022 disponibile: '+m[1].replace('maps-app-',''),'stale');showUpdateBanner()}}catch(e){}}
-const TOP_12M=20000;const TOP_VOL_MIN=5000;const TOP_GROW_MIN=3000;const TOP_GROW_PCT=0.10,CALO_RATIO=0.6,CALO_MIN=3000;
+const TOP_12M=20000,CALO_RATIO=0.6,CALO_MIN=3000;
 
 function monthsSince(t){return t?Math.max(0,Math.round((REF_END-t)/(30.44*DAY))):null}
 
-function isFin(c){if((c.bizType||'')==='finanziaria')return true;return /\b(LEASING|NOLEGG|RENT|RENTAL|FACTOR|LOCAZION|LOCAT)\b/i.test(c.name||'')}
-function isTop(c){if(isFin(c))return false;const w=WIN.get(c.id);if(!w)return false;const cur=w.ya||0,prev=w.yb||0;
- if(cur<TOP_VOL_MIN)return false;const cresc=cur-prev;if(cresc<TOP_GROW_MIN)return false;
- if(prev<=0)return cur>=TOP_GROW_MIN;return cresc/prev>=TOP_GROW_PCT}
+function isTop(c){const w=WIN.get(c.id);return (w?w.a:0)>=TOP_12M}
 function computeRefYear(force){const sig=`${Object.keys(project.clients).length}|${project.updatedAt||''}`;if(!force&&sig===STATS_SIG&&WIN.size)return;STATS_SIG=sig;
 let y=0,maxT=0;const all=Object.values(project.clients);
 for(const c of all){for(const k of Object.keys(c.saleYears||{})){const n=num(k);if(n>y)y=n}for(const l of c.saleLines||[]){const t=parseDMY(l.date);if(t&&t>maxT&&t<=Date.now()+DAY)maxT=t}}
 REF_YEAR=y;REF_END=maxT||Date.now();
 const w1=REF_END-365*DAY,w2=REF_END-730*DAY,h1=REF_END-182*DAY,h2=REF_END-547*DAY,h3=REF_END-365*DAY;
 WIN.clear();
-const endD=new Date(REF_END);const curYear=endD.getUTCFullYear();const mm=endD.getUTCMonth(),dd=endD.getUTCDate();
-const beforeCutoff=(t)=>{const m=t.getUTCMonth(),d=t.getUTCDate();return m<mm||(m===mm&&d<=dd)};
-for(const c of all){let a=0,b=0,a6=0,b6=0,last=0,dated=false,ya=0,yb=0;
+for(const c of all){let a=0,b=0,a6=0,b6=0,last=0,dated=false;
 for(const l of c.saleLines||[]){const t=parseDMY(l.date);if(!t)continue;dated=true;if(t>last)last=t;const v=num(l.amount);
  if(t>w1)a+=v;else if(t>w2)b+=v;
- if(t>h1)a6+=v;else if(t>h2&&t<=h3)b6+=v;
- const ty=t.getUTCFullYear();if(beforeCutoff(t)){if(ty===curYear)ya+=v;else if(ty===curYear-1)yb+=v}}
+ if(t>h1)a6+=v;else if(t>h2&&t<=h3)b6+=v}
 // portafoglio ordini aperto = domanda del periodo corrente, assegnata per data di creazione
 let oa=0,oa6=0;
 for(const l of c.orderLines||[]){const v=num(l.amount);const t=parseDMY(l.date);
  if(!t){oa+=v;oa6+=v;continue}
  if(t>w1)oa+=v;
  if(t>h1)oa6+=v}
-WIN.set(c.id,{a,b,a6,b6,oa,oa6,last,dated,ya,yb})}
+WIN.set(c.id,{a,b,a6,b6,oa,oa6,last,dated})}
 REF_LABEL=maxT?`12 mesi al ${new Date(REF_END).toLocaleDateString('it-IT')}`:`anno ${REF_YEAR}`}
 function monthsSince(t){return t?Math.max(0,Math.round((REF_END-t)/(30.44*DAY))):null}
 function caloLabel(pct,parts){const p=parts.filter(Boolean);return `In calo ${Math.round(pct)}%${p.length?` (${p.join(', ')})`:''}`}
-function clientStatus(c){if(isFin(c))return{status:'finanziaria',label:'Finanziaria / Leasing'};const w=WIN.get(c.id);const hasOpen=(c.orders||0)>0;const sales=c.sales||0;
+function clientStatus(c){const w=WIN.get(c.id);const hasOpen=(c.orders||0)>0;const sales=c.sales||0;
 let cur,prev,dated=!!(w&&w.dated);const oa=w?w.oa:0,oa6=w?w.oa6:0;
 if(dated){cur=w.a;prev=w.b}
 else{const thisYear=new Date().getUTCFullYear();const ref=REF_YEAR>=thisYear?REF_YEAR-1:REF_YEAR;if(!ref)return{status:'',label:''};
@@ -280,7 +274,7 @@ function macAgeYears(c){const t=clientType(c).last;return t?(REF_END-t)/(365.25*
 function lastMacDesc(c){const ev=clientType(c).ev;if(!ev.length)return'';const t=ev[ev.length-1];
  const l=(c.saleLines||[]).find(x=>clsKind(x.cls)==='mac'&&parseDMY(x.date)===t);
  return l?`${l.description||''} (${new Date(t).toLocaleDateString('it-IT')})`:''}
-const BIZ={officina:'Officina / autoriparazione',gommista:'Gommista / pneumatici',carrozzeria:'Carrozzeria',concessionaria:'Concessionaria / autosalone',rivenditore:'Rivenditore / distributore',service:'Service / assistenza tecnica',trasporti:'Trasporti / noleggio',agente:'Agente / intermediario',finanziaria:'Finanziaria / Leasing / Noleggio',altro:'Altro'};
+const BIZ={officina:'Officina / autoriparazione',gommista:'Gommista / pneumatici',carrozzeria:'Carrozzeria',concessionaria:'Concessionaria / autosalone',rivenditore:'Rivenditore / distributore',service:'Service / assistenza tecnica',trasporti:'Trasporti / noleggio',agente:'Agente / intermediario',altro:'Altro'};
 // Suggerimento dal nome: è solo un'ipotesi, va confermata dall'agente. Ordine = priorità.
 // L'ordine conta: chi vende attrezzature vince su parole generiche come GARAGE o MECCANICA,
 // perché "GARAGE EQUIPMENT" e "X FORNITURE" sono rivenditori, non officine.
@@ -525,7 +519,7 @@ function updateYears(){const years=new Set();for(const c of Object.values(projec
 function render(){computeRefYear();const all=Object.values(project.clients),view=filtered();fillSelect('#agentFilter',[...new Set(all.map(agentOf).filter(Boolean))]);{const sig=[...new Set(all.map(provOf).filter(Boolean))].sort().join(',')+'|'+[...geoSel.regions].join(',');if(sig!==_geoSig)renderGeoFilters(all);}updateYears();updateProductSuggestions();const visibleLines=view.flatMap(matchingLines);const filteredSales=visibleLines.filter(x=>x.kind==='sale').reduce((s,x)=>s+x.amount,0),filteredOrders=visibleLines.filter(x=>x.kind==='order').reduce((s,x)=>s+x.amount,0);$('#clientCount').textContent=view.length;$('#mappedCount').textContent=view.filter(c=>c.lat!=null).length;$('#ordersTotal').textContent=euro(hasTransactionFilter()?filteredOrders:view.reduce((s,c)=>s+c.orders,0));$('#salesTotal').textContent=euro(hasTransactionFilter()?filteredSales:view.reduce((s,c)=>s+c.sales,0));$('#status').textContent=statusText();renderList(view);renderMarkers(view);renderTour();renderMailPanel();renderBizPanel();renderAgentReview();renderStart();if($('#refInfo'))$('#refInfo').innerHTML=`Stato clienti calcolato su: ${escapeHtml(REF_LABEL)}. I clienti con ordini aperti non sono mai classificati dormienti.${hasClassData()?'':' <b style="color:#b45309">Per i filtri Tipo cliente ed Età macchina reimporta il file vendite.</b>'}`}
 function fillSelect(sel,vals){const el=$(sel),cur=el.value,label=el.options[0].text;el.innerHTML=`<option value="">${label}</option>`+vals.sort().map(v=>`<option>${escapeHtml(v)}</option>`).join('');el.value=cur}
 function renderList(items){$('#list').innerHTML=items.slice(0,400).map(c=>{const st=clientStatus(c),inTour=project.tour?.includes(c.id),lines=matchingLines(c),fs=lines.filter(x=>x.kind==='sale').reduce((s,x)=>s+x.amount,0),fo=lines.filter(x=>x.kind==='order').reduce((s,x)=>s+x.amount,0);return `<article class="client" data-id="${c.id}"><h3>${escapeHtml(c.name||c.id)}</h3><p>${escapeHtml([c.city,c.province,c.agent].filter(Boolean).join(' · '))}</p><div class="badges">${(hasTransactionFilter()?fo:c.orders)?`<span class="badge order">Ordini ${euro(hasTransactionFilter()?fo:c.orders)}</span>`:''}${(hasTransactionFilter()?fs:c.sales)?`<span class="badge sales">Vendite ${euro(hasTransactionFilter()?fs:c.sales)}</span>`:''}${hasTransactionFilter()?`<span class="badge">${lines.length} righe prodotto</span>`:''}${st.label?`<span class="badge ${st.status==='calo'?'risk':'sleep'}">${escapeHtml(st.label)}</span>`:''}${c.lat==null?'<span class="badge missing">Da geocodificare</span>':''}<button type="button" class="mini tour-add${inTour?' on':''}" data-tour="${c.id}">${inTour?'✓ Giro':'+ Giro'}</button></div></article>`}).join('')+(items.length>400?`<p style="padding:8px;opacity:.7"><small>Elenco limitato a 400 di ${items.length} clienti (la mappa li mostra tutti). Usa i filtri per restringere.</small></p>`:'');document.querySelectorAll('.client').forEach(x=>x.onclick=()=>openDetail(x.dataset.id));document.querySelectorAll('.tour-add').forEach(b=>b.onclick=e=>{e.stopPropagation();toggleTour(b.dataset.tour)})}
-function renderMarkers(items){if(!markers||typeof L==='undefined')return;markers.clearLayers();for(const c of items){if(c.lat==null)continue;const st=clientStatus(c);const cls=isFin(c)?'fin':st.status==='calo'?'risk':st.status==='dormiente'?'sleep':c.orders>0?'order':isTop(c)?'top':'';const icon=L.divIcon({className:'',html:`<div class="marker-dot ${cls}"></div>`,iconSize:[18,18],iconAnchor:[9,9]});const m=L.marker([c.lat,c.lng],{icon,draggable:dragMode}).addTo(markers).bindTooltip(c.name||c.id);m.on('click',()=>{if(!dragMode)openDetail(c.id)});m.on('dragend',e=>{const p=e.target.getLatLng();if(!confirm(`Spostare «${c.name||c.id}» qui?\n\nLa posizione verrà salvata come manuale.`)){render();return}c.lat=p.lat;c.lng=p.lng;c.manualPosition=true;save()})}}
+function renderMarkers(items){if(!markers||typeof L==='undefined')return;markers.clearLayers();for(const c of items){if(c.lat==null)continue;const st=clientStatus(c);const cls=st.status==='calo'?'risk':st.status==='dormiente'?'sleep':c.orders>0?'order':isTop(c)?'top':'';const icon=L.divIcon({className:'',html:`<div class="marker-dot ${cls}"></div>`,iconSize:[18,18],iconAnchor:[9,9]});const m=L.marker([c.lat,c.lng],{icon,draggable:dragMode}).addTo(markers).bindTooltip(c.name||c.id);m.on('click',()=>{if(!dragMode)openDetail(c.id)});m.on('dragend',e=>{const p=e.target.getLatLng();if(!confirm(`Spostare «${c.name||c.id}» qui?\n\nLa posizione verrà salvata come manuale.`)){render();return}c.lat=p.lat;c.lng=p.lng;c.manualPosition=true;save()})}}
 function openDetail(id){currentId=id;const c=project.clients[id];const years=Object.entries(c.saleYears||{}).sort((a,b)=>b[0]-a[0]).map(([y,v])=>`${y}: ${euro(v)}`).join('<br>')||'—';$('#detail').innerHTML=`<h2>${escapeHtml(c.name||c.id)}</h2><p>${escapeHtml([c.address,c.cap,c.city,c.province].filter(Boolean).join(', '))}</p><div class="detail-grid"><div class="detail-box"><b>${euro(c.orders)}</b><span>Ordini aperti</span></div><div class="detail-box"><b>${euro(c.sales)}</b><span>Vendite totali</span></div><div class="detail-box"><b>${escapeHtml(agentOf(c)||'—')}</b><span>Agente${c.agentOverride?' (corretto a mano)':''}</span></div><div class="detail-box"><b>${escapeHtml(bizLabel(c)||'da classificare')}</b><span>Tipo di attività${(()=>{const a=macAgeYears(c);return a!=null?` · macchina di ${a.toFixed(1)} anni`:''})()}</span></div><div class="detail-box"><b>${years}</b><span>Vendite per anno</span></div></div>${(()=>{const cf=agentConflict(c);return cf?`<div class="agent-review"><b>Agente da rivedere</b><div class="agent-review-row">La tua correzione: <b>${escapeHtml(cf.tuo)}</b></div><div class="agent-review-row">Il gestionale prima diceva <b>${escapeHtml(cf.prima||'nessuno')}</b>, <b>ora dice ${escapeHtml(cf.ora||'nessuno')}</b>.</div><div class="row" style="margin-top:8px"><button type="button" id="agentKeep" class="mini">Tieni «${escapeHtml(cf.tuo)}»</button><button type="button" id="agentTake" class="mini primary">Usa «${escapeHtml(cf.ora||'nessuno')}» dal gestionale</button></div></div>`:''})()}<div class="field"><label>Agente di riferimento</label><div class="row"><select id="detailAgent" style="flex:1"><option value="">— dal gestionale: ${escapeHtml(c.agent||'nessuno')} —</option>${agentList().map(a=>`<option value="${escapeHtml(a)}"${norm(c.agentOverride)===a?' selected':''}>${escapeHtml(a)}</option>`).join('')}</select><input id="detailAgentNew" placeholder="oppure scrivi un nome" value="${escapeHtml(agentList().includes(norm(c.agentOverride))?'':norm(c.agentOverride))}" style="flex:1"></div><small class="muted" style="display:block;margin-top:6px">Il gestionale assegna <b>${escapeHtml(c.agent||'nessun agente')}</b>. Qui puoi correggerlo: la correzione vince, resta nel progetto e sopravvive al reimport degli Excel.</small></div><div class="field"><label>Tipo di attività</label><div class="row"><select id="detailBiz" style="flex:1"><option value="">— da classificare —</option>${Object.entries(BIZ).map(([k,v])=>`<option value="${k}"${bizOf(c)===k?' selected':''}>${escapeHtml(v)}</option>`).join('')}</select><button type="button" id="detailBizWeb" class="ghost" title="Cerca l'azienda online per capire che mestiere fa">Cerca online</button></div><small id="detailBizHint" class="muted" style="display:block;margin-top:6px"></small></div><div class="field"><label>Coordinate</label><div class="row"><input id="lat" value="${c.lat??''}" placeholder="Latitudine"><input id="lng" value="${c.lng??''}" placeholder="Longitudine"></div></div><div class="field"><label>Note locali</label><textarea id="note">${escapeHtml(c.note||'')}</textarea></div><div class="detail-actions"><button type="button" id="tourToggle">${project.tour?.includes(c.id)?'− Rimuovi dal giro':'+ Aggiungi al giro'}</button><button type="button" id="saveDetail" class="primary">Salva</button><a class="button" target="_blank" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.lat!=null?`${c.lat},${c.lng}`:[c.address,c.city,c.province].join(' '))}">Naviga</a></div><p><small>${c.phones?.map(escapeHtml).join(' · ')||''}<br>${c.emails?.map(escapeHtml).join(' · ')||''}</small></p>`;$('#tourToggle').onclick=()=>{toggleTour(id);$('#detailDialog').close()};$('#saveDetail').onclick=()=>{const lat=parseFloat($('#lat').value),lng=parseFloat($('#lng').value);c.lat=Number.isFinite(lat)?lat:null;c.lng=Number.isFinite(lng)?lng:null;c.manualPosition=Number.isFinite(lat)&&Number.isFinite(lng);c.note=$('#note').value;save();$('#detailDialog').close()};
 const bz=$('#detailBiz');
 if(bz){bz.onchange=()=>{c.bizType=bz.value||'';save();fillBizHint(c);render()};fillBizHint(c)}
