@@ -949,3 +949,34 @@ Nota: su Chrome desktop il modo più affidabile di installare resta l'icona nell
 indirizzi; il pulsante in pagina è una comodità aggiuntiva, non l'unico canale.
 
 sw.js: cache v14.11.
+
+## v14.12 — Fine del problema aggiornamenti: versione negli URL + no-cache
+
+Il problema si ripresentava anche su Mac: il banner "Aggiorna ora" restava e cliccarlo non
+cambiava nulla. Causa: oltre alla cache del service worker c'è la **cache HTTP del browser**,
+che serve i file vecchi senza nemmeno chiedere al server. Nessun pulsante dentro l'app poteva
+aggirarla del tutto.
+
+Tre correzioni che risolvono alla radice:
+1. **Versione negli URL degli asset.** index.html ora richiama `app.js?v=14-12`,
+   `style.css?v=14-12`, `manifest.webmanifest?v=14-12`, e registra `sw.js?v=<versione>`. A
+   ogni rilascio l'URL cambia: un URL nuovo il browser è OBBLIGATO a scaricarlo, non può
+   servire il vecchio. È la pratica standard che elimina il problema.
+2. **Service worker no-cache.** Il fetch dei file dello stesso sito ora usa `cache:'no-cache'`:
+   rivalida sempre col server invece di fidarsi della cache HTTP. La cache del SW resta solo
+   come fallback offline.
+3. **"Aggiorna ora" ricarica con bypass.** Dopo aver svuotato cache e SW, ricarica su un URL
+   con `?fresh=timestamp` invece del semplice reload.
+
+**Script di build.** Aggiunto `build.py`: `python3 build.py 14.13` applica la versione a
+tutti i file (APP_VERSION, SW_EXPECTED, CACHE, e i ?v= negli asset) in un colpo, evitando
+disallineamenti fra file — che erano una fonte ricorrente di questi blocchi.
+
+**Per uscire dal blocco QUESTA volta** (Mac e Windows, nel browser): premere il tasto di
+ricarica forzata, che scavalca sia la cache HTTP sia il service worker:
+- Mac: Cmd + Maiusc + R
+- Windows: Ctrl + Maiusc + R
+Se non basta: F12 → Application → "Clear site data", poi ricaricare. Dalla v14.12 in poi il
+problema non si ripresenta perché ogni versione ha URL diversi.
+
+sw.js: cache v14.12.

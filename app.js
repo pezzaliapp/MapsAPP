@@ -213,15 +213,16 @@ const DAY=86400000;
 
 function monthsSince(t){return t?Math.max(0,Math.round((REF_END-t)/(30.44*DAY))):null}
 
-const APP_VERSION='v14.11';
+const APP_VERSION='v14.12';
 function setVerBadge(txt,cls){const el=$('#verBadge');if(!el)return;el.textContent=txt;el.className='ver'+(cls?' '+cls:'')}
 function showUpdateBanner(){updatePending=true;refreshInstallUI();if($('#updBanner'))return;const d=document.createElement('div');d.id='updBanner';d.className='upd-banner';
  d.innerHTML=`<span>È disponibile una versione più recente di Maps APP.</span><button type="button" id="updNow">Aggiorna ora</button>`;
  document.body.appendChild(d);$('#updNow').onclick=async()=>{const b=$('#updNow');if(b){b.disabled=true;b.textContent='Aggiornamento…'}
   try{if('caches'in window){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}
    if('serviceWorker'in navigator){const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs)await r.unregister()}}catch(e){}
-  location.reload(true)};}
-const SW_EXPECTED='maps-app-v14-11-install-win';
+  // ricarico su un URL con bypass della cache HTTP, altrimenti il browser rispolvera i file vecchi
+  location.replace(location.pathname+'?fresh='+Date.now())};}
+const SW_EXPECTED='maps-app-v14-12-rel';
 async function checkVersion(){setVerBadge(APP_VERSION);
  try{const res=await fetch('sw.js?ts='+Date.now(),{cache:'no-store'});const m=/const CACHE='([^']+)'/.exec(await res.text());
   if(m&&m[1]!==SW_EXPECTED){setVerBadge(APP_VERSION+' \u2022 disponibile: '+m[1].replace('maps-app-',''),'stale');showUpdateBanner()}}catch(e){}}
@@ -595,7 +596,7 @@ $('#installBtn').onclick=async()=>{
   if(giaInstallata){alert('Maps APP risulta GIÀ installata su questo computer.\n\nAprila dal menu Start (cerca “Maps APP”) o da chrome://apps.\n\nSe vuoi reinstallarla: chrome://apps → tasto destro su Maps APP → Rimuovi, poi ricarica questa pagina e reinstalla.');refreshInstallUI();return}
   alert('Per installare Maps APP su Windows (Chrome/Edge):\n\n1. Guarda a DESTRA nella barra degli indirizzi: c’è una piccola icona di installazione (un monitor con una freccia in giù). Cliccala → Installa.\n2. In alternativa: menu ⋮ in alto a destra → “Installa Maps APP” (o “App” → “Installa questo sito come app”).\n\nSe non trovi né l’icona né la voce, l’app è probabilmente già installata: cercala nel menu Start o in chrome://apps.\n\n(Firefox desktop non supporta l’installazione.)')};
 (async()=>{await load();initMap();render();if('serviceWorker'in navigator){let reloaded=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloaded)return;reloaded=true;location.reload()});}
-if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').then(reg=>{setInterval(()=>reg.update().catch(()=>{}),60000);
+if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js?v='+SW_EXPECTED).then(reg=>{setInterval(()=>reg.update().catch(()=>{}),60000);
  reg.addEventListener('updatefound',()=>{const w=reg.installing;if(!w)return;w.addEventListener('statechange',()=>{if(w.state==='installed'&&navigator.serviceWorker.controller)showUpdateBanner()})});
  reg.update().catch(()=>{});setInterval(()=>reg.update().catch(()=>{}),60*60*1000);
  checkVersion()}).catch(e=>console.warn('SW',e));else setVerBadge('no SW')})();
