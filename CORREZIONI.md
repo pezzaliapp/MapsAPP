@@ -1005,3 +1005,28 @@ canale sempre affidabile su desktop è l'icona di installazione nella barra degl
 - Quando invece il prompt nativo è disponibile, il pulsante installa direttamente come prima.
 
 sw.js: cache v14.13.
+
+## v14.14 — TROVATA la causa: icona SVG che non carica bloccava l'installazione
+
+Con DevTools → Application → Manifest, Chrome ha finalmente detto la ragione esatta:
+"Icon https://www.alessandropezzali.it/MapsAPP/icons/icon.svg failed to load". Il manifest
+dichiarava anche `icons/icon.svg`, che sul server NON è raggiungibile. Un'icona dichiarata che
+non carica fa fallire il requisito di installabilità → niente icona di installazione nella
+barra, niente prompt. Tutti gli altri requisiti erano a posto (manifest servito correttamente,
+service worker attivo, PNG 192/512 validi, HTTPS).
+
+**Correzioni.**
+- Rimosso `icons/icon.svg` dal manifest, dalla lista ASSETS del service worker e dal
+  `<link rel="icon">` di index.html (sostituito con `icon-192.png`). Restano solo i PNG, che
+  caricano correttamente: 192, 512 e 512 maskable — sufficienti e richiesti per l'installazione.
+- Aggiunti `screenshots` (wide + narrow) al manifest per abilitare l'interfaccia di
+  installazione ricca ed eliminare i due warning "Richer PWA Install UI won't be available".
+
+Nota: il file icon.svg nel pacchetto esisteva; il problema era che sul server non veniva
+servito. Toglierlo dal manifest risolve a prescindere, senza dover indagare la configurazione
+del server.
+
+Dopo l'aggiornamento a v14.14 (ricarica forzata Ctrl+Maiusc+R), l'icona di installazione deve
+comparire nella barra degli indirizzi di Chrome/Edge su Windows.
+
+sw.js: cache v14.14.
