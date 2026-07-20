@@ -895,3 +895,31 @@ il banner farà da sé.
 Dopo il primo sblocco alla v14.8+, gli aggiornamenti successivi si applicano da soli.
 
 sw.js: cache v14.9.
+
+## v14.10 — Windows bloccato con "Aggiorna" e "Installa" insieme
+
+Segnalazione: su Windows, anche svuotando la cache, restano visibili sia "Aggiorna" sia
+"Installa". Un pasticcio.
+
+**Perché "svuotare la cache" non basta.** Il service worker di una PWA conserva i file in un
+magazzino separato (Cache Storage) e resta registrato: la pulizia normale della cache del
+browser NON lo rimuove. Così il vecchio service worker continua a servire i file vecchi — da
+qui il pulsante "Installa" del codice vecchio, e insieme il badge/banner "Aggiorna" che rileva
+la versione nuova sul server. Due pulsanti in contraddizione.
+
+**Correzioni.**
+- **Niente più due pulsanti in conflitto**: quando c'è un aggiornamento in sospeso, nel
+  browser il pulsante "Installa" viene nascosto — prima si aggiorna, poi semmai si installa.
+- **Nuovo pulsante "Ripristina app (forza aggiornamento)"** tra i controlli mappa: svuota
+  tutte le cache del programma, sregistra i service worker e ricarica l'ultima versione dal
+  sito con bypass della cache (`?fresh=timestamp`). I dati locali non vengono toccati. È la
+  via d'uscita a un clic dai blocchi di cache, senza dover entrare nelle impostazioni del
+  browser. Chiede conferma e ricorda di esportare prima.
+
+**Sbloccare Windows QUESTA volta** (il pulsante nuovo non c'è ancora nella versione bloccata):
+apri il sito in una scheda del browser (non l'app installata) → F12 → scheda Application →
+"Service Workers" → Unregister; poi "Storage" → "Clear site data"; infine ricarica. In
+alternativa, disinstalla da edge://apps o chrome://apps e reinstalla. Dalla v14.10 in poi
+basta il pulsante "Ripristina app".
+
+sw.js: cache v14.10.

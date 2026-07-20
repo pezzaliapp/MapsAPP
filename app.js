@@ -213,15 +213,15 @@ const DAY=86400000;
 
 function monthsSince(t){return t?Math.max(0,Math.round((REF_END-t)/(30.44*DAY))):null}
 
-const APP_VERSION='v14.9';
+const APP_VERSION='v14.10';
 function setVerBadge(txt,cls){const el=$('#verBadge');if(!el)return;el.textContent=txt;el.className='ver'+(cls?' '+cls:'')}
-function showUpdateBanner(){if($('#updBanner'))return;const d=document.createElement('div');d.id='updBanner';d.className='upd-banner';
+function showUpdateBanner(){updatePending=true;refreshInstallUI();if($('#updBanner'))return;const d=document.createElement('div');d.id='updBanner';d.className='upd-banner';
  d.innerHTML=`<span>È disponibile una versione più recente di Maps APP.</span><button type="button" id="updNow">Aggiorna ora</button>`;
  document.body.appendChild(d);$('#updNow').onclick=async()=>{const b=$('#updNow');if(b){b.disabled=true;b.textContent='Aggiornamento…'}
   try{if('caches'in window){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}
    if('serviceWorker'in navigator){const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs)await r.unregister()}}catch(e){}
   location.reload(true)};}
-const SW_EXPECTED='maps-app-v14-9-safe-area';
+const SW_EXPECTED='maps-app-v14-10-reset';
 async function checkVersion(){setVerBadge(APP_VERSION);
  try{const res=await fetch('sw.js?ts='+Date.now(),{cache:'no-store'});const m=/const CACHE='([^']+)'/.exec(await res.text());
   if(m&&m[1]!==SW_EXPECTED){setVerBadge(APP_VERSION+' \u2022 disponibile: '+m[1].replace('maps-app-',''),'stale');showUpdateBanner()}}catch(e){}}
@@ -483,6 +483,12 @@ function renderAgentReview(){const conf=agentConflicts();const pan=$('#agentRevi
   info.innerHTML=es+(conf.length>4?`<small class="muted">\u2026e altri ${conf.length-4}</small>`:'')}
  const b=$('#agentReviewShow');if(b)b.classList.toggle('primary',agentReviewOnly)}
 function matchAgentReview(c){return !agentReviewOnly||!!agentConflict(c)}
+async function hardResetApp(){
+ if(!confirm('Ripristinare l\u2019app?\n\nVengono svuotate le cache del programma e ricaricata l\u2019ultima versione dal sito. I tuoi dati (clienti, classificazioni, posizioni) NON vengono toccati: restano salvati nel dispositivo.\n\nProcedo?'))return;
+ try{if('caches'in window){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}
+  if('serviceWorker'in navigator){const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs)await r.unregister()}}catch(e){}
+ // ricarico bypassando ogni cache
+ location.href=location.pathname+'?fresh='+Date.now()}
 function statusText(){const x=project.imports;return ['clienti','ordini','vendite'].map(k=>x[k]?`${k}: ${x[k].rows} righe`:`${k}: non importato`).join(' · ')}
 function selectedYears(){const from=num($('#yearFrom').value)||-Infinity,to=num($('#yearTo').value)||Infinity;return{from,to}}
 function lineYear(line){if(line.year)return num(line.year);const m=String(line.date||'').match(/(\d{4})$/);return m?num(m[1]):0}
@@ -535,6 +541,7 @@ $('#excelInput').onchange=e=>importFiles([...e.target.files]);$('#projectInput')
  if(p.subset&&cur>n){const chi=[...(p.subset.agents||[]),...(p.subset.regions||[])].join(', ')||'selezione';
   if(!confirm(`Attenzione: questo \u00e8 un progetto PARZIALE (${n} clienti \u2014 ${chi}).\n\nAprendolo sostituisci il progetto che hai adesso, che ne contiene ${cur}: gli altri ${cur-n} spariscono da questo dispositivo.\n\nSe volevi solo riportare le correzioni dell'agente, annulla e usa "Unisci progetto".\n\nAprire lo stesso?`)){e.target.value='';return}}
  project=p;migrateAgentBase();await save();fit()}catch{alert('Progetto non valido')}finally{e.target.value=''}};$('#exportBtn').onclick=exportProject;
+$('#resetAppBtn')&&($('#resetAppBtn').onclick=hardResetApp);
 $('#prodAdd').onclick=addProd;
 $('#productSearch').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addProd()}});
 $('#prodAll').onchange=render;
@@ -559,7 +566,9 @@ const isIOS=()=>/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platfo
 // - App nel browser e installabile: mostro "Installa".
 // - App nel browser ma già installata (o non installabile): nascondo tutto.
 let installed=false;
+let updatePending=false;
 function refreshInstallUI(){const b=$('#installBtn');if(!b)return;
+  if(updatePending&&!isStandalone()){b.hidden=true;return}   // prima aggiorna, poi semmai installa
   if(isStandalone()){b.hidden=false;b.textContent='Disinstalla';b.dataset.mode='uninstall';return}
   if(deferredPrompt&&!installed){b.hidden=false;b.textContent='Installa';b.dataset.mode='install';return}
   if(installed){b.hidden=true;return}          // già installata: niente pulsante nel browser

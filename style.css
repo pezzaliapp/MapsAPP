@@ -85,3 +85,7 @@ label input{margin-top:3px}
 .agent-review{background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;padding:10px 12px;margin-bottom:12px}
 .agent-review>b{color:#92400e;display:block;margin-bottom:4px}
 .agent-review-row{font-size:13px;color:#78350f;line-height:1.5}
+
+/* v14.10: pulsante di ripristino app */
+.ghost-danger{background:#fff;color:#b91c1c;border:1px solid #fecaca}
+.ghost-danger:hover{background:#fef2f2}
