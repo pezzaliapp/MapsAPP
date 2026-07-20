@@ -789,3 +789,23 @@ override vecchio senza base (migrato senza falso allarme). Risoluzione verificat
 entrambe le direzioni; il conflitto si chiude e non si ripresenta.
 
 sw.js: cache v14.5.
+
+## v14.6 — Marker non più trascinabili per sbaglio
+
+Segnalazione: cliccando un cliente sulla mappa e trascinando, questo si spostava. Rischio di
+spostare clienti involontariamente.
+
+**Causa.** Ogni marker era creato con `draggable:true`: bastava un trascinamento accidentale
+per riposizionare il cliente e salvare la nuova posizione come manuale.
+
+**Correzione.** I marker ora sono **fissi di default** (`draggable:false`). Il clic apre la
+scheda come prima. Per spostare un cliente restano due strade deliberate:
+- modificare le coordinate dalla sua scheda (campi Latitudine/Longitudine, già presenti);
+- attivare l'interruttore "Consenti spostamento clienti sulla mappa" sotto i controlli mappa
+  (spento di default). Con la modalità attiva il marker si trascina, ma il clic non apre più
+  la scheda (per non interferire) e ogni spostamento chiede conferma prima di salvare.
+
+Test: verificata la creazione reale del marker — draggable segue la modalità, il clic apre la
+scheda solo a modalità spenta, il drag chiede conferma e l'annullamento non modifica nulla.
+
+sw.js: cache v14.6.

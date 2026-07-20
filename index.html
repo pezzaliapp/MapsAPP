@@ -101,7 +101,8 @@
         <button id="fitBtn">Mostra tutti</button>
         <button id="geocodeBtn">Geocodifica mancanti</button>
       </div>
-      <small>La geocodifica usa OpenStreetMap/Nominatim e richiede connessione. Le coordinate vengono poi salvate localmente.</small>
+      <label id="dragModeBox" class="prod-mode"><input type="checkbox" id="dragModeToggle"> Consenti spostamento clienti sulla mappa<span class="muted"> (di norma spento: si evitano spostamenti per sbaglio)</span></label>
+      <small>La geocodifica usa OpenStreetMap/Nominatim e richiede connessione. Le coordinate vengono poi salvate localmente. Per spostare un cliente puoi anche modificare le coordinate dalla sua scheda.</small>
       <small id="refInfo" class="muted"></small>
       <small class="muted">In calo = consegnato sotto il 60% del periodo precedente, su 12 mesi <b>oppure</b> su 6 mesi (vs gli stessi 6 mesi dell'anno prima). Gli <b>ordini in corso vengono sommati al periodo attuale</b>: chi ha ordini in portafoglio non è in calo, la consegna deve ancora avvenire. Top = almeno 20.000 € consegnati negli ultimi 12 mesi.</small>
       <small>Marker: <b style="color:#dc2626">rosso</b>=in calo · <b style="color:#9ca3af">grigio</b>=dormiente · <b style="color:#f97316">arancio</b>=ordini aperti · <b style="color:#16a34a">verde</b>=top (≥20k in 12 mesi) · <b style="color:#3b82f6">blu</b>=altri</small>
