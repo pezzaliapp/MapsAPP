@@ -722,3 +722,70 @@ Il file `stampa_vendite_10_07_26.xlsx` allegato per il controllo ha 16.326 righe
 `vendite.xlsx`, che arriva al 15/07/2026.
 
 sw.js: cache v14.3.
+
+## v14.4 — Aggiornare i dati dal gestionale senza perdere le classificazioni
+
+Domanda operativa: come importare i tre Excel aggiornati dal gestionale senza sovrascrivere
+il lavoro fatto (tipo attività, agente, note, posizioni) ma prendendo comunque i dati nuovi.
+
+### Come funziona (era già quasi tutto in piedi)
+"Importa Excel" su un progetto già avviato **non ricrea i clienti**: la funzione interna
+aggiorna l'anagrafica e aggiunge vendite/ordini, ma i campi che lavori tu (bizType,
+agentOverride, note, lat/lng, manualPosition) non vengono toccati. Quindi il flusso corretto
+è: apri il tuo progetto, poi "Importa Excel" con i tre file nuovi. Le classificazioni restano,
+i numeri si aggiornano.
+
+### Cosa ho aggiunto
+- **Clienti spariti dal gestionale.** Se un cliente che avevi classificato non è più
+  nell'anagrafica nuova, ora viene conservato (marcato "non più in anagrafica", senza
+  vendite) invece di restare com'era o sparire in silenzio: non perdi la classificazione se
+  il cliente riappare. I clienti spariti che non avevi mai lavorato e sono senza storico
+  vengono rimossi.
+- **Riepilogo esplicito** a fine import quando è un aggiornamento: conferma che le
+  classificazioni sono state mantenute, e dice quanti clienti sono stati conservati e quanti
+  rimossi.
+
+### Stesso comportamento nel generatore fuori app
+`rigenera.py` (lo script che uso per ricostruire il JSON dai tre Excel) ora conserva anch'esso
+i clienti lavorati ma non più in anagrafica, con lo stesso criterio.
+
+sw.js: cache v14.4.
+
+## v14.5 — Agente cambiato dal gestionale: revisione mirata
+
+Richiesta: può capitare di aver assegnato a mano un cliente a un agente, e che poi il
+gestionale lo associ a un altro ancora che stavolta è quello giusto. Serve un avviso nella
+scheda che dica chi era assegnato prima e chi ora — MA senza riproporre tutte le correzioni
+già fatte che semplicemente differiscono dal gestionale.
+
+### La distinzione che conta
+Ogni tua correzione è per definizione diversa dal gestionale: segnalarle tutte sarebbe
+rumore. Quello che serve è segnalare solo i casi in cui il gestionale è CAMBIATO *dopo* la
+tua correzione. Per distinguerli, l'app ora ricorda cosa diceva il gestionale nel momento in
+cui hai corretto (campo `agentBase`).
+
+Un cliente è "da rivedere" quando: hai una correzione manuale (agentOverride) **e** il
+gestionale ora dice qualcosa di diverso da quello che diceva quando hai corretto **e** il
+nuovo valore non coincide già con la tua scelta. Negli altri casi non ti viene riproposto.
+
+### Cosa vedi
+- **Nella scheda**, se il caso è da rivedere, un riquadro giallo: "La tua correzione: X · Il
+  gestionale prima diceva Y, ora dice Z", con due pulsanti: "Tieni «X»" e "Usa «Z» dal
+  gestionale". Qualunque scelta chiude la segnalazione (la base si riallinea).
+- **Pannello "Agenti da rivedere"** (compare solo se ce ne sono): conta i casi, ne elenca i
+  primi, e "Mostra solo questi sulla mappa" per lavorarli in fila senza cercarli.
+
+### Migrazione degli override esistenti
+Le correzioni fatte prima di questa funzione non hanno `agentBase`: non so cosa dicesse il
+gestionale allora. Vengono allineate alla situazione attuale al primo caricamento, così non
+compaiono come falsi conflitti (verificato: i 50 override esistenti danno 0 falsi allarmi).
+Da lì in poi, ogni cambiamento reale del gestionale viene rilevato.
+
+### Test
+Cinque scenari verificati con codice reale: correzione con gestionale invariato (non
+segnalato), correzione con gestionale cambiato (segnalato con prima/ora), gestionale che ora
+coincide con la tua scelta (non segnalato), cliente mai corretto (segue il gestionale),
+override vecchio senza base (migrato senza falso allarme). Risoluzione verificata in
+entrambe le direzioni; il conflitto si chiude e non si ripresenta.
+
+sw.js: cache v14.5.

@@ -134,6 +134,13 @@
       <small>“Ottimizza” ordina le tappe partendo dalla tua posizione (se autorizzi il GPS) e genera i link di navigazione Google Maps. Le tappe su Sardegna e Sicilia formano sezioni separate (serve traghetto/volo): il percorso non le collega mai via terra. Km stradali reali via OSRM; costi: carburante e pedaggi (tariffa media classe A, autostrade sarde/siciliane in gran parte gratuite quindi escluse). Prezzi aggiornabili nei campi qui sopra.</small>
     </section>
 
+    <section class="panel" id="agentReviewPanel" hidden>
+      <h2 style="margin:0 0 8px;font-size:16px">Agenti da rivedere <span id="agentReviewCount"></span></h2>
+      <div id="agentReviewInfo"></div>
+      <div class="row"><button id="agentReviewShow" class="primary">Mostra solo questi sulla mappa</button></div>
+      <small>Clienti dove avevi corretto l'agente a mano e il gestionale, nell'ultimo import, ha cambiato il suo. Aprendo la scheda scegli se tenere la tua correzione o prendere il nuovo valore. Non compaiono le correzioni che avevi già fatto e che il gestionale non ha toccato.</small>
+    </section>
+
     <section class="panel" id="bizPanel">
       <h2 style="margin:0 0 8px;font-size:16px">Tipo di attività <span id="bizCount"></span></h2>
       <div id="bizInfo"></div>

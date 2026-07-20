@@ -15,7 +15,7 @@ function openDb(){return new Promise((resolve,reject)=>{const req=indexedDB.open
 async function persistProject(){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(DB_STORE,'readwrite');tx.objectStore(DB_STORE).put(project,DB_KEY);tx.oncomplete=()=>{db.close();resolve()};tx.onerror=()=>{db.close();reject(tx.error)}})}
 async function readProject(){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(DB_STORE,'readonly');const req=tx.objectStore(DB_STORE).get(DB_KEY);req.onsuccess=()=>{db.close();resolve(req.result)};req.onerror=()=>{db.close();reject(req.error)}})}
 async function save(){project.updatedAt=new Date().toISOString();try{await persistProject()}catch(e){console.error('IndexedDB',e);throw e}render()}
-async function load(){try{let p=await readProject();if(!p){const legacy=localStorage.getItem(LEGACY_KEY);if(legacy){p=JSON.parse(legacy);project=p;await persistProject();localStorage.removeItem(LEGACY_KEY)}}if(p?.clients){project=p;project.tour??=[];project.tourStart??=null;project.emailsOff??=[];project.tourStartLabel??='';for(const c of Object.values(project.clients)){c.orderLines??=[];c.saleLines??=[];c.saleYears??={}}const before=Object.keys(project.clients).length;migrateClients();if(Object.keys(project.clients).length!==before)await persistProject()}}catch(e){console.warn(e)}}
+async function load(){try{let p=await readProject();if(!p){const legacy=localStorage.getItem(LEGACY_KEY);if(legacy){p=JSON.parse(legacy);project=p;await persistProject();localStorage.removeItem(LEGACY_KEY)}}if(p?.clients){project=p;migrateAgentBase();project.tour??=[];project.tourStart??=null;project.emailsOff??=[];project.tourStartLabel??='';for(const c of Object.values(project.clients)){c.orderLines??=[];c.saleLines??=[];c.saleYears??={}}const before=Object.keys(project.clients).length;migrateClients();if(Object.keys(project.clients).length!==before)await persistProject()}}catch(e){console.warn(e)}}
 function migrateClients(){const merged={};for(const[k,c]of Object.entries(project.clients)){const id=canonId(k)||k;if(!merged[id]){merged[id]={...c,id};continue}const t=merged[id];t.name=t.name||c.name;t.address=t.address||c.address;t.city=t.city||c.city;t.cap=t.cap||c.cap;t.province=t.province||c.province;t.agent=t.agent||c.agent;t.agentCode=t.agentCode||c.agentCode;t.abc=t.abc||c.abc;t.payment=t.payment||c.payment;t.note=[t.note,c.note].filter(Boolean).join('\n');t.orders=(t.orders||0)+(c.orders||0);t.sales=(t.sales||0)+(c.sales||0);t.orderLines=[...(t.orderLines||[]),...(c.orderLines||[])];t.saleLines=[...(t.saleLines||[]),...(c.saleLines||[])];for(const[y,v]of Object.entries(c.saleYears||{}))t.saleYears[y]=(t.saleYears[y]||0)+v;t.emails=[...new Set([...(t.emails||[]),...(c.emails||[])])];t.phones=[...new Set([...(t.phones||[]),...(c.phones||[])])];if(t.lat==null&&c.lat!=null){t.lat=c.lat;t.lng=c.lng;t.manualPosition=c.manualPosition}}project.clients=merged}
 function initMap(){if(typeof L==='undefined'){document.getElementById('map').innerHTML='<div style="padding:24px;text-align:center"><b>Mappa non disponibile.</b><br><small>Serve una connessione Internet per caricare la cartografia. L’importazione Excel funziona comunque.</small></div>';return}map=L.map('map').setView([42.5,12.5],6);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);markers=L.layerGroup().addTo(map);tourLayer=L.layerGroup().addTo(map)}
 function xmlText(node){return Array.from(node.getElementsByTagNameNS('*','t')).map(x=>x.textContent||'').join('')}
@@ -30,6 +30,10 @@ async function importFiles(files){
   if(!files.length)return;
   const status=$('#status');
   let imported=0,errors=[];
+  const avevo=Object.keys(project.clients).length;
+  if(avevo>0)migrateAgentBase();   // fissa la base degli override che non ce l'hanno ancora
+  const lavorati=new Set(Object.entries(project.clients).filter(([id,c])=>c.bizType||c.agentOverride||c.note||c.manualPosition).map(([id])=>id));
+  window.__seenClientIds=new Set();   // riempito da importClients
   status.textContent='Lettura Excel in corso…';
   await new Promise(r=>setTimeout(r,80));
   for(const file of files){
@@ -64,10 +68,24 @@ async function importFiles(files){
     errors.push('Salvataggio locale non riuscito: spazio o permessi del browser insufficienti');
   }
   try{render()}catch(e){console.error(e);errors.push(`Visualizzazione: ${e.message||'errore'}`)}
+  // Se stavo AGGIORNANDO (avevo già clienti e ho ricaricato l'anagrafica), controllo chi è sparito.
+  let conservati=0,rimossi=0;
+  if(avevo>0&&window.__seenClientIds&&window.__seenClientIds.size){
+    const seen=window.__seenClientIds;
+    for(const [id,c] of Object.entries(project.clients)){
+      if(seen.has(id)||(c.saleLines&&c.saleLines.length)||(c.orderLines&&c.orderLines.length))continue;
+      if(lavorati.has(id)){c.notInRegistry=true;conservati++;}   // classificato da te: lo tengo
+      else{delete project.clients[id];rimossi++;}                 // vuoto e sparito: via
+    }
+  }
+  window.__seenClientIds=null;
   const clients=Object.keys(project.clients).length;
   const mapped=Object.values(project.clients).filter(c=>c.lat!=null&&c.lng!=null).length;
-  status.textContent=`${clients} clienti caricati · ${mapped} mappati`;
-  let msg=`Importazione terminata. File riconosciuti: ${imported}. Clienti caricati: ${clients}.`;
+  status.textContent=`${clients} clienti · ${mapped} mappati`;
+  let msg=`Importazione terminata. File riconosciuti: ${imported}. Clienti nel progetto: ${clients}.`;
+  if(avevo>0)msg+=`\n\nAggiornamento sui dati esistenti: le tue classificazioni (tipo attività, agente, note, posizioni) sono state mantenute.`;
+  if(conservati)msg+=`\n${conservati} clienti che avevi classificato non sono più nell'anagrafica del gestionale: li ho conservati (senza vendite) così non perdi il lavoro.`;
+  if(rimossi)msg+=`\n${rimossi} clienti non più presenti e senza tuo lavoro sono stati rimossi.`;
   if(clients>0&&mapped===0)msg+='\n\nIl file clienti non contiene coordinate geografiche. Per vedere i marker usa “Geocodifica mancanti”.';
   if(errors.length)msg+=`\n\nAvvisi:\n${errors.join('\n')}`;
   alert(msg);
@@ -75,7 +93,7 @@ async function importFiles(files){
 }
 
 function ensure(id,name=''){id=canonId(id);if(!id||id==='00000')return null;return project.clients[id]??={id,name,emails:[],phones:[],orders:0,sales:0,orderLines:[],saleLines:[],saleYears:{},note:'',lat:null,lng:null,manualPosition:false}}
-function importClients(rows){const ak=agentDescKey(rows);const seen=new Set();for(const r of rows){const id=canonId(r['CLIENTE']);if(!id||id==='00000')continue;const rs=norm(r['RAGIONE SOCIALE 1']||r['RAGIONE SOCIALE']);const c=ensure(id,rs);c.name=rs||c.name;c.address=norm(r['INDIRIZZO']);c.city=norm(r['CITTA']||r['LOCALITA']||r['COMUNE']);c.cap=norm(r['CAP']).padStart(5,'0');c.province=norm(r['PROVINCIA']);c.agentCode=norm(r['AGENTE']);c.agent=(ak?norm(r[ak]):'')||(norm(r['AGENTE'])?`cod. ${norm(r['AGENTE'])}`:'');c.abc=norm(r['CLASSE ABC']);c.payment=norm(r['DESCRIZIONE ELEMENTO']);[r['NR.TELEFONICO'],r['NR.CELLULARE']].map(norm).filter(Boolean).forEach(x=>{if(!c.phones.includes(x))c.phones.push(x)});for(const em of splitEmails(r['EMAIL']))if(!c.emails.some(x=>x.toLowerCase()===em))c.emails.push(em);seen.add(id)}project.imports.clientiCount=seen.size}
+function importClients(rows){const ak=agentDescKey(rows);const seen=new Set();for(const r of rows){const id=canonId(r['CLIENTE']);if(!id||id==='00000')continue;if(window.__seenClientIds)window.__seenClientIds.add(id);const rs=norm(r['RAGIONE SOCIALE 1']||r['RAGIONE SOCIALE']);const c=ensure(id,rs);c.name=rs||c.name;c.address=norm(r['INDIRIZZO']);c.city=norm(r['CITTA']||r['LOCALITA']||r['COMUNE']);c.cap=norm(r['CAP']).padStart(5,'0');c.province=norm(r['PROVINCIA']);c.agentCode=norm(r['AGENTE']);c.agent=(ak?norm(r[ak]):'')||(norm(r['AGENTE'])?`cod. ${norm(r['AGENTE'])}`:'');c.abc=norm(r['CLASSE ABC']);c.payment=norm(r['DESCRIZIONE ELEMENTO']);[r['NR.TELEFONICO'],r['NR.CELLULARE']].map(norm).filter(Boolean).forEach(x=>{if(!c.phones.includes(x))c.phones.push(x)});for(const em of splitEmails(r['EMAIL']))if(!c.emails.some(x=>x.toLowerCase()===em))c.emails.push(em);seen.add(id)}project.imports.clientiCount=seen.size}
 function importOrders(rows){const dk=classDescKey(rows);for(const c of Object.values(project.clients)){c.orders=0;c.orderLines=[]}for(const r of rows){const c=ensure(r['CLIENTE'],r['CLIENTE_1']);if(!c)continue;const amount=num(r['IMPORTO INEVASO']);c.name=c.name||norm(r['CLIENTE_1']);c.orders+=amount;c.orderLines.push({order:norm(r['NUM.']),date:excelDate(r['DATA CREAZIONE']),delivery:excelDate(r['DATA CONSEGNA']),year:norm(r['ANNO']),article:norm(r['ARTICOLO']),cls:learnClass(r,dk),description:norm(r['DESCRIZIONE']),qty:num(r['QTA INEVASA']),amount})}}
 function classDescKey(rows){const k=Object.keys(rows[0]||{});const i=k.indexOf('CLASSE 3 ARTICOLO');return i>=0&&k[i+1]?k[i+1]:null}
 // La descrizione dell'agente è la colonna subito dopo AGENTE. Niente ripieghi su altre
@@ -195,13 +213,13 @@ const DAY=86400000;
 
 function monthsSince(t){return t?Math.max(0,Math.round((REF_END-t)/(30.44*DAY))):null}
 
-const APP_VERSION='v14.3';
+const APP_VERSION='v14.5';
 function setVerBadge(txt,cls){const el=$('#verBadge');if(!el)return;el.textContent=txt;el.className='ver'+(cls?' '+cls:'')}
 function showUpdateBanner(){if($('#updBanner'))return;const d=document.createElement('div');d.id='updBanner';d.className='upd-banner';
  d.innerHTML=`<span>È disponibile una versione più recente di Maps APP.</span><button type="button" id="updNow">Aggiorna ora</button>`;
  document.body.appendChild(d);$('#updNow').onclick=async()=>{if('serviceWorker'in navigator){const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs)await r.unregister()}location.reload(true)};
  setVerBadge(APP_VERSION+' · aggiornamento pronto','stale')}
-const SW_EXPECTED='maps-app-v14-3-modelli';
+const SW_EXPECTED='maps-app-v14-5-agente-rivedi';
 async function checkVersion(){setVerBadge(APP_VERSION);
  try{const res=await fetch('sw.js?ts='+Date.now(),{cache:'no-store'});const m=/const CACHE='([^']+)'/.exec(await res.text());
   if(m&&m[1]!==SW_EXPECTED)setVerBadge(APP_VERSION+' \u2022 sul server: '+m[1].replace('maps-app-',''),'stale')}catch(e){}}
@@ -321,6 +339,25 @@ function exportClientsCsv(){const f=filtered();
  $('#status').textContent=`Esportati ${f.length} clienti con il tipo di attività.`}
 function agentOf(c){return norm(c.agentOverride)||norm(c.agent)||''}
 function agentList(){return [...new Set(Object.values(project.clients).map(agentOf).filter(Boolean))].sort()}
+// C'è un conflitto da rivedere quando: hai corretto l'agente a mano (agentOverride),
+// e il gestionale ORA dice qualcosa di diverso da quello che diceva QUANDO hai corretto
+// (agentBase). Non basta che l'override sia diverso dal gestionale — quello è sempre vero:
+// conta che il gestionale sia CAMBIATO dopo la tua correzione.
+function agentConflict(c){const ov=norm(c.agentOverride);if(!ov)return null;
+ const base=norm(c.agentBase),now=norm(c.agent);
+ if(base===''||base===now)return null;      // il gestionale non è cambiato: la tua scelta vale
+ if(now===ov)return null;                    // il gestionale ora coincide con la tua: niente da rivedere
+ return{tuo:ov,prima:base,ora:now}}
+function agentConflicts(){return Object.values(project.clients).filter(c=>agentConflict(c))}
+// Override fatti prima di questa funzione: non hanno agentBase, quindi non so cosa diceva il
+// gestionale quando li hai corretti. Li allineo alla situazione attuale, così non compaiono
+// come falsi conflitti. Da qui in poi, ogni cambiamento del gestionale verrà rilevato.
+function migrateAgentBase(){let n=0;for(const c of Object.values(project.clients||{})){
+ if(norm(c.agentOverride)&&c.agentBase===undefined){c.agentBase=norm(c.agent);n++}}return n}
+function resolveAgent(c,keep){const now=norm(c.agent);
+ if(keep==='gestionale'){c.agentOverride='';}          // prendi il valore nuovo del gestionale
+ c.agentBase=now;                                       // in ogni caso: allineo la base, il conflitto si chiude
+ save();render()}
 
 // ---------- Export parziale per agente/regione e unione dei rientri ----------
 const shareSel={agents:new Set(),regions:new Set()};
@@ -433,12 +470,22 @@ function renderChips(){const box=$('#prodChips');if(!box)return;
 function addProd(){const v=norm($('#productSearch').value);if(!v)return;
  if(!prodSel.includes(v))prodSel.push(v);
  $('#productSearch').value='';renderChips();render()}
+let agentReviewOnly=false;
+function renderAgentReview(){const conf=agentConflicts();const pan=$('#agentReviewPanel');if(!pan)return;
+ pan.hidden=conf.length===0;
+ if(conf.length===0){agentReviewOnly=false;return}
+ const el=$('#agentReviewCount');if(el)el.textContent=`(${conf.length})`;
+ const info=$('#agentReviewInfo');
+ if(info){const es=conf.slice(0,4).map(c=>{const cf=agentConflict(c);return `<div class="mail-info" style="margin-bottom:4px"><b>${escapeHtml(c.name||c.id)}</b>: tua «${escapeHtml(cf.tuo)}» \u2192 gestionale ora «${escapeHtml(cf.ora||'nessuno')}»</div>`}).join('');
+  info.innerHTML=es+(conf.length>4?`<small class="muted">\u2026e altri ${conf.length-4}</small>`:'')}
+ const b=$('#agentReviewShow');if(b)b.classList.toggle('primary',agentReviewOnly)}
+function matchAgentReview(c){return !agentReviewOnly||!!agentConflict(c)}
 function statusText(){const x=project.imports;return ['clienti','ordini','vendite'].map(k=>x[k]?`${k}: ${x[k].rows} righe`:`${k}: non importato`).join(' · ')}
 function selectedYears(){const from=num($('#yearFrom').value)||-Infinity,to=num($('#yearTo').value)||Infinity;return{from,to}}
 function lineYear(line){if(line.year)return num(line.year);const m=String(line.date||'').match(/(\d{4})$/);return m?num(m[1]):0}
 
 
-function filtered(){const q=norm($('#search').value).toLowerCase(),ag=$('#agentFilter').value;return Object.values(project.clients).filter(c=>(!q||[c.name,c.city,c.province,c.id].join(' ').toLowerCase().includes(q))&&(!ag||agentOf(c)===ag)&&(!geoSel.regions.size||geoSel.regions.has(regionOf(provOf(c))))&&(!geoSel.provinces.size||geoSel.provinces.has(provOf(c)))&&(!$('#onlyOrders').checked||c.orders>0)&&(!$('#onlySales').checked||c.sales>0)&&(!$('#onlyMissing').checked||c.lat==null)&&(!$('#statusFilter').value||clientStatus(c).status===$('#statusFilter').value)&&matchType(c)&&matchBehavior(c)&&matchAge(c)&&matchProducts(c)&&(!hasTransactionFilter()||matchingLines(c).length>0))}
+function filtered(){const q=norm($('#search').value).toLowerCase(),ag=$('#agentFilter').value;return Object.values(project.clients).filter(c=>(!q||[c.name,c.city,c.province,c.id].join(' ').toLowerCase().includes(q))&&(!ag||agentOf(c)===ag)&&matchAgentReview(c)&&(!geoSel.regions.size||geoSel.regions.has(regionOf(provOf(c))))&&(!geoSel.provinces.size||geoSel.provinces.has(provOf(c)))&&(!$('#onlyOrders').checked||c.orders>0)&&(!$('#onlySales').checked||c.sales>0)&&(!$('#onlyMissing').checked||c.lat==null)&&(!$('#statusFilter').value||clientStatus(c).status===$('#statusFilter').value)&&matchType(c)&&matchBehavior(c)&&matchAge(c)&&matchProducts(c)&&(!hasTransactionFilter()||matchingLines(c).length>0))}
 function matchType(c){const v=$('#typeFilter')?.value;if(!v)return true;
  if(v==='__set')return !!bizOf(c); if(v==='__unset')return !bizOf(c);
  return bizOf(c)===v || (!bizOf(c)&&guessBiz(c)===v)}
@@ -458,17 +505,20 @@ function updateProductSuggestions(){const q=prodNorm($('#productSearch').value),
   .sort((a,b)=>b.cli.size-a.cli.size).slice(0,250);
  $('#productSuggestions').innerHTML=out.map(m=>`<option value="${escapeHtml(m.label)}">${m.cli.size} client${m.cli.size===1?'e':'i'}</option>`).join('')}
 function updateYears(){const years=new Set();for(const c of Object.values(project.clients))for(const x of [...(c.saleLines||[]),...(c.orderLines||[])]){const y=lineYear(x);if(y)years.add(y)}const vals=[...years].sort((a,b)=>b-a);for(const id of ['yearFrom','yearTo']){const el=$(`#${id}`),cur=el.value,label=id==='yearFrom'?'Da anno':'A anno';el.innerHTML=`<option value="">${label}</option>`+vals.map(y=>`<option value="${y}">${y}</option>`).join('');el.value=cur}}
-function render(){computeRefYear();const all=Object.values(project.clients),view=filtered();fillSelect('#agentFilter',[...new Set(all.map(agentOf).filter(Boolean))]);{const sig=[...new Set(all.map(provOf).filter(Boolean))].sort().join(',')+'|'+[...geoSel.regions].join(',');if(sig!==_geoSig)renderGeoFilters(all);}updateYears();updateProductSuggestions();const visibleLines=view.flatMap(matchingLines);const filteredSales=visibleLines.filter(x=>x.kind==='sale').reduce((s,x)=>s+x.amount,0),filteredOrders=visibleLines.filter(x=>x.kind==='order').reduce((s,x)=>s+x.amount,0);$('#clientCount').textContent=view.length;$('#mappedCount').textContent=view.filter(c=>c.lat!=null).length;$('#ordersTotal').textContent=euro(hasTransactionFilter()?filteredOrders:view.reduce((s,c)=>s+c.orders,0));$('#salesTotal').textContent=euro(hasTransactionFilter()?filteredSales:view.reduce((s,c)=>s+c.sales,0));$('#status').textContent=statusText();renderList(view);renderMarkers(view);renderTour();renderMailPanel();renderBizPanel();renderStart();if($('#refInfo'))$('#refInfo').innerHTML=`Stato clienti calcolato su: ${escapeHtml(REF_LABEL)}. I clienti con ordini aperti non sono mai classificati dormienti.${hasClassData()?'':' <b style="color:#b45309">Per i filtri Tipo cliente ed Età macchina reimporta il file vendite.</b>'}`}
+function render(){computeRefYear();const all=Object.values(project.clients),view=filtered();fillSelect('#agentFilter',[...new Set(all.map(agentOf).filter(Boolean))]);{const sig=[...new Set(all.map(provOf).filter(Boolean))].sort().join(',')+'|'+[...geoSel.regions].join(',');if(sig!==_geoSig)renderGeoFilters(all);}updateYears();updateProductSuggestions();const visibleLines=view.flatMap(matchingLines);const filteredSales=visibleLines.filter(x=>x.kind==='sale').reduce((s,x)=>s+x.amount,0),filteredOrders=visibleLines.filter(x=>x.kind==='order').reduce((s,x)=>s+x.amount,0);$('#clientCount').textContent=view.length;$('#mappedCount').textContent=view.filter(c=>c.lat!=null).length;$('#ordersTotal').textContent=euro(hasTransactionFilter()?filteredOrders:view.reduce((s,c)=>s+c.orders,0));$('#salesTotal').textContent=euro(hasTransactionFilter()?filteredSales:view.reduce((s,c)=>s+c.sales,0));$('#status').textContent=statusText();renderList(view);renderMarkers(view);renderTour();renderMailPanel();renderBizPanel();renderAgentReview();renderStart();if($('#refInfo'))$('#refInfo').innerHTML=`Stato clienti calcolato su: ${escapeHtml(REF_LABEL)}. I clienti con ordini aperti non sono mai classificati dormienti.${hasClassData()?'':' <b style="color:#b45309">Per i filtri Tipo cliente ed Età macchina reimporta il file vendite.</b>'}`}
 function fillSelect(sel,vals){const el=$(sel),cur=el.value,label=el.options[0].text;el.innerHTML=`<option value="">${label}</option>`+vals.sort().map(v=>`<option>${escapeHtml(v)}</option>`).join('');el.value=cur}
 function renderList(items){$('#list').innerHTML=items.slice(0,400).map(c=>{const st=clientStatus(c),inTour=project.tour?.includes(c.id),lines=matchingLines(c),fs=lines.filter(x=>x.kind==='sale').reduce((s,x)=>s+x.amount,0),fo=lines.filter(x=>x.kind==='order').reduce((s,x)=>s+x.amount,0);return `<article class="client" data-id="${c.id}"><h3>${escapeHtml(c.name||c.id)}</h3><p>${escapeHtml([c.city,c.province,c.agent].filter(Boolean).join(' · '))}</p><div class="badges">${(hasTransactionFilter()?fo:c.orders)?`<span class="badge order">Ordini ${euro(hasTransactionFilter()?fo:c.orders)}</span>`:''}${(hasTransactionFilter()?fs:c.sales)?`<span class="badge sales">Vendite ${euro(hasTransactionFilter()?fs:c.sales)}</span>`:''}${hasTransactionFilter()?`<span class="badge">${lines.length} righe prodotto</span>`:''}${st.label?`<span class="badge ${st.status==='calo'?'risk':'sleep'}">${escapeHtml(st.label)}</span>`:''}${c.lat==null?'<span class="badge missing">Da geocodificare</span>':''}<button type="button" class="mini tour-add${inTour?' on':''}" data-tour="${c.id}">${inTour?'✓ Giro':'+ Giro'}</button></div></article>`}).join('')+(items.length>400?`<p style="padding:8px;opacity:.7"><small>Elenco limitato a 400 di ${items.length} clienti (la mappa li mostra tutti). Usa i filtri per restringere.</small></p>`:'');document.querySelectorAll('.client').forEach(x=>x.onclick=()=>openDetail(x.dataset.id));document.querySelectorAll('.tour-add').forEach(b=>b.onclick=e=>{e.stopPropagation();toggleTour(b.dataset.tour)})}
 function renderMarkers(items){if(!markers||typeof L==='undefined')return;markers.clearLayers();for(const c of items){if(c.lat==null)continue;const st=clientStatus(c);const cls=st.status==='calo'?'risk':st.status==='dormiente'?'sleep':c.orders>0?'order':isTop(c)?'top':'';const icon=L.divIcon({className:'',html:`<div class="marker-dot ${cls}"></div>`,iconSize:[18,18],iconAnchor:[9,9]});const m=L.marker([c.lat,c.lng],{icon,draggable:true}).addTo(markers).bindTooltip(c.name||c.id);m.on('click',()=>openDetail(c.id));m.on('dragend',e=>{const p=e.target.getLatLng();c.lat=p.lat;c.lng=p.lng;c.manualPosition=true;save()})}}
-function openDetail(id){currentId=id;const c=project.clients[id];const years=Object.entries(c.saleYears||{}).sort((a,b)=>b[0]-a[0]).map(([y,v])=>`${y}: ${euro(v)}`).join('<br>')||'—';$('#detail').innerHTML=`<h2>${escapeHtml(c.name||c.id)}</h2><p>${escapeHtml([c.address,c.cap,c.city,c.province].filter(Boolean).join(', '))}</p><div class="detail-grid"><div class="detail-box"><b>${euro(c.orders)}</b><span>Ordini aperti</span></div><div class="detail-box"><b>${euro(c.sales)}</b><span>Vendite totali</span></div><div class="detail-box"><b>${escapeHtml(agentOf(c)||'—')}</b><span>Agente${c.agentOverride?' (corretto a mano)':''}</span></div><div class="detail-box"><b>${escapeHtml(bizLabel(c)||'da classificare')}</b><span>Tipo di attività${(()=>{const a=macAgeYears(c);return a!=null?` · macchina di ${a.toFixed(1)} anni`:''})()}</span></div><div class="detail-box"><b>${years}</b><span>Vendite per anno</span></div></div><div class="field"><label>Agente di riferimento</label><div class="row"><select id="detailAgent" style="flex:1"><option value="">— dal gestionale: ${escapeHtml(c.agent||'nessuno')} —</option>${agentList().map(a=>`<option value="${escapeHtml(a)}"${norm(c.agentOverride)===a?' selected':''}>${escapeHtml(a)}</option>`).join('')}</select><input id="detailAgentNew" placeholder="oppure scrivi un nome" value="${escapeHtml(agentList().includes(norm(c.agentOverride))?'':norm(c.agentOverride))}" style="flex:1"></div><small class="muted" style="display:block;margin-top:6px">Il gestionale assegna <b>${escapeHtml(c.agent||'nessun agente')}</b>. Qui puoi correggerlo: la correzione vince, resta nel progetto e sopravvive al reimport degli Excel.</small></div><div class="field"><label>Tipo di attività</label><div class="row"><select id="detailBiz" style="flex:1"><option value="">— da classificare —</option>${Object.entries(BIZ).map(([k,v])=>`<option value="${k}"${bizOf(c)===k?' selected':''}>${escapeHtml(v)}</option>`).join('')}</select><button type="button" id="detailBizWeb" class="ghost" title="Cerca l'azienda online per capire che mestiere fa">Cerca online</button></div><small id="detailBizHint" class="muted" style="display:block;margin-top:6px"></small></div><div class="field"><label>Coordinate</label><div class="row"><input id="lat" value="${c.lat??''}" placeholder="Latitudine"><input id="lng" value="${c.lng??''}" placeholder="Longitudine"></div></div><div class="field"><label>Note locali</label><textarea id="note">${escapeHtml(c.note||'')}</textarea></div><div class="detail-actions"><button type="button" id="tourToggle">${project.tour?.includes(c.id)?'− Rimuovi dal giro':'+ Aggiungi al giro'}</button><button type="button" id="saveDetail" class="primary">Salva</button><a class="button" target="_blank" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.lat!=null?`${c.lat},${c.lng}`:[c.address,c.city,c.province].join(' '))}">Naviga</a></div><p><small>${c.phones?.map(escapeHtml).join(' · ')||''}<br>${c.emails?.map(escapeHtml).join(' · ')||''}</small></p>`;$('#tourToggle').onclick=()=>{toggleTour(id);$('#detailDialog').close()};$('#saveDetail').onclick=()=>{const lat=parseFloat($('#lat').value),lng=parseFloat($('#lng').value);c.lat=Number.isFinite(lat)?lat:null;c.lng=Number.isFinite(lng)?lng:null;c.manualPosition=Number.isFinite(lat)&&Number.isFinite(lng);c.note=$('#note').value;save();$('#detailDialog').close()};
+function openDetail(id){currentId=id;const c=project.clients[id];const years=Object.entries(c.saleYears||{}).sort((a,b)=>b[0]-a[0]).map(([y,v])=>`${y}: ${euro(v)}`).join('<br>')||'—';$('#detail').innerHTML=`<h2>${escapeHtml(c.name||c.id)}</h2><p>${escapeHtml([c.address,c.cap,c.city,c.province].filter(Boolean).join(', '))}</p><div class="detail-grid"><div class="detail-box"><b>${euro(c.orders)}</b><span>Ordini aperti</span></div><div class="detail-box"><b>${euro(c.sales)}</b><span>Vendite totali</span></div><div class="detail-box"><b>${escapeHtml(agentOf(c)||'—')}</b><span>Agente${c.agentOverride?' (corretto a mano)':''}</span></div><div class="detail-box"><b>${escapeHtml(bizLabel(c)||'da classificare')}</b><span>Tipo di attività${(()=>{const a=macAgeYears(c);return a!=null?` · macchina di ${a.toFixed(1)} anni`:''})()}</span></div><div class="detail-box"><b>${years}</b><span>Vendite per anno</span></div></div>${(()=>{const cf=agentConflict(c);return cf?`<div class="agent-review"><b>Agente da rivedere</b><div class="agent-review-row">La tua correzione: <b>${escapeHtml(cf.tuo)}</b></div><div class="agent-review-row">Il gestionale prima diceva <b>${escapeHtml(cf.prima||'nessuno')}</b>, <b>ora dice ${escapeHtml(cf.ora||'nessuno')}</b>.</div><div class="row" style="margin-top:8px"><button type="button" id="agentKeep" class="mini">Tieni «${escapeHtml(cf.tuo)}»</button><button type="button" id="agentTake" class="mini primary">Usa «${escapeHtml(cf.ora||'nessuno')}» dal gestionale</button></div></div>`:''})()}<div class="field"><label>Agente di riferimento</label><div class="row"><select id="detailAgent" style="flex:1"><option value="">— dal gestionale: ${escapeHtml(c.agent||'nessuno')} —</option>${agentList().map(a=>`<option value="${escapeHtml(a)}"${norm(c.agentOverride)===a?' selected':''}>${escapeHtml(a)}</option>`).join('')}</select><input id="detailAgentNew" placeholder="oppure scrivi un nome" value="${escapeHtml(agentList().includes(norm(c.agentOverride))?'':norm(c.agentOverride))}" style="flex:1"></div><small class="muted" style="display:block;margin-top:6px">Il gestionale assegna <b>${escapeHtml(c.agent||'nessun agente')}</b>. Qui puoi correggerlo: la correzione vince, resta nel progetto e sopravvive al reimport degli Excel.</small></div><div class="field"><label>Tipo di attività</label><div class="row"><select id="detailBiz" style="flex:1"><option value="">— da classificare —</option>${Object.entries(BIZ).map(([k,v])=>`<option value="${k}"${bizOf(c)===k?' selected':''}>${escapeHtml(v)}</option>`).join('')}</select><button type="button" id="detailBizWeb" class="ghost" title="Cerca l'azienda online per capire che mestiere fa">Cerca online</button></div><small id="detailBizHint" class="muted" style="display:block;margin-top:6px"></small></div><div class="field"><label>Coordinate</label><div class="row"><input id="lat" value="${c.lat??''}" placeholder="Latitudine"><input id="lng" value="${c.lng??''}" placeholder="Longitudine"></div></div><div class="field"><label>Note locali</label><textarea id="note">${escapeHtml(c.note||'')}</textarea></div><div class="detail-actions"><button type="button" id="tourToggle">${project.tour?.includes(c.id)?'− Rimuovi dal giro':'+ Aggiungi al giro'}</button><button type="button" id="saveDetail" class="primary">Salva</button><a class="button" target="_blank" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.lat!=null?`${c.lat},${c.lng}`:[c.address,c.city,c.province].join(' '))}">Naviga</a></div><p><small>${c.phones?.map(escapeHtml).join(' · ')||''}<br>${c.emails?.map(escapeHtml).join(' · ')||''}</small></p>`;$('#tourToggle').onclick=()=>{toggleTour(id);$('#detailDialog').close()};$('#saveDetail').onclick=()=>{const lat=parseFloat($('#lat').value),lng=parseFloat($('#lng').value);c.lat=Number.isFinite(lat)?lat:null;c.lng=Number.isFinite(lng)?lng:null;c.manualPosition=Number.isFinite(lat)&&Number.isFinite(lng);c.note=$('#note').value;save();$('#detailDialog').close()};
 const bz=$('#detailBiz');
 if(bz){bz.onchange=()=>{c.bizType=bz.value||'';save();fillBizHint(c);render()};fillBizHint(c)}
 const ag=$('#detailAgent'),agn=$('#detailAgentNew');
-if(ag&&agn){const applica=()=>{const v=norm(agn.value)||norm(ag.value);c.agentOverride=v&&v!==norm(c.agent)?v:'';save();render();
+if(ag&&agn){const applica=()=>{const v=norm(agn.value)||norm(ag.value);c.agentOverride=v&&v!==norm(c.agent)?v:'';c.agentBase=norm(c.agent);save();render();
   const box=$('#detail .detail-box:nth-child(3) b');if(box)box.textContent=agentOf(c)||'—'};
  ag.onchange=()=>{if(norm(ag.value))agn.value='';applica()};agn.onchange=applica;agn.oninput=()=>{if(norm(agn.value))ag.value=''}}
+const ak2=$('#agentKeep'),at2=$('#agentTake');
+if(ak2)ak2.onclick=()=>{resolveAgent(c,'tua');openDetail(c)};
+if(at2)at2.onclick=()=>{resolveAgent(c,'gestionale');openDetail(c)};
 const wb=$('#detailBizWeb');
 if(wb)wb.onclick=()=>{const q=[c.name,c.city,c.province,'ATECO attività'].filter(Boolean).join(' ');
  window.open('https://www.google.com/search?q='+encodeURIComponent(q),'_blank','noopener')};
@@ -481,7 +531,7 @@ $('#excelInput').onchange=e=>importFiles([...e.target.files]);$('#projectInput')
  const n=Object.keys(p.clients).length,cur=Object.keys(project.clients||{}).length;
  if(p.subset&&cur>n){const chi=[...(p.subset.agents||[]),...(p.subset.regions||[])].join(', ')||'selezione';
   if(!confirm(`Attenzione: questo \u00e8 un progetto PARZIALE (${n} clienti \u2014 ${chi}).\n\nAprendolo sostituisci il progetto che hai adesso, che ne contiene ${cur}: gli altri ${cur-n} spariscono da questo dispositivo.\n\nSe volevi solo riportare le correzioni dell'agente, annulla e usa "Unisci progetto".\n\nAprire lo stesso?`)){e.target.value='';return}}
- project=p;await save();fit()}catch{alert('Progetto non valido')}finally{e.target.value=''}};$('#exportBtn').onclick=exportProject;
+ project=p;migrateAgentBase();await save();fit()}catch{alert('Progetto non valido')}finally{e.target.value=''}};$('#exportBtn').onclick=exportProject;
 $('#prodAdd').onclick=addProd;
 $('#productSearch').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addProd()}});
 $('#prodAll').onchange=render;
@@ -493,6 +543,7 @@ $('#shareAgNone').onclick=()=>{shareSel.agents.clear();renderShare()};
 $('#shareRegAll').onclick=()=>{shareSel.regions=new Set(Object.values(project.clients).map(c=>regionOf(provOf(c))||'(senza regione)'));renderShare()};
 $('#shareRegNone').onclick=()=>{shareSel.regions.clear();renderShare()};
 $('#mergeInput').onchange=async e=>{try{const p=JSON.parse(await e.target.files[0].text());mergeProject(p)}catch(err){alert('File non leggibile: '+err.message)}finally{e.target.value=''}};$('#fitBtn').onclick=fit;$('#geocodeBtn').onclick=geocodeMissing;$('#tourAddFiltered').onclick=tourAddFiltered;$('#tourClear').onclick=()=>{project.tour=[];invalidateRoute();save()};$('#tourOptimize').onclick=optimizeTour;$('#startGps').onclick=setStartGps;$('#startAddr').onchange=setStartAddr;$('#mailExport').onclick=exportMail;
+$('#agentReviewShow').onclick=()=>{agentReviewOnly=!agentReviewOnly;renderAgentReview();render()};
 $('#bizManage').onclick=()=>{bizTodoOnly=false;renderBizList();$('#bizDialog').showModal()};
 $('#bizClose').onclick=()=>$('#bizDialog').close();
 $('#bizOnlyTodo').onclick=()=>{bizTodoOnly=!bizTodoOnly;$('#bizOnlyTodo').classList.toggle('primary',bizTodoOnly);renderBizList()};
