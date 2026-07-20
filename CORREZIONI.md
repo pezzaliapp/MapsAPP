@@ -1030,3 +1030,24 @@ Dopo l'aggiornamento a v14.14 (ricarica forzata Ctrl+Maiusc+R), l'icona di insta
 comparire nella barra degli indirizzi di Chrome/Edge su Windows.
 
 sw.js: cache v14.14.
+
+## v14.15 — Titolo finestra sbagliato ("CASCOS — Configuratore") su Windows
+
+Segnalazione con schermata: l'app installata su Windows funziona (badge v14.14, dati corretti,
+pulsante Disinstalla presente → l'installazione dopo la v14.14 va), ma il titolo della finestra
+mostrava "CASCOS — Configuratore 2 Colonne (PWA) - Maps APP". "CASCOS — Configuratore" non è in
+Maps APP: viene da un'ALTRA PWA installata sullo stesso dominio (alessandropezzali.it).
+
+**Causa.** Nel manifest, `id`, `start_url` e `scope` erano relativi (`./`). Con più PWA sullo
+stesso dominio ma in cartelle diverse, un id relativo non le distingue: Windows/Chrome può
+confondere le identità e mescolare i titoli delle finestre.
+
+**Correzione.** Dato a Maps APP un'identità assoluta e univoca nel manifest:
+`id`, `start_url` e `scope` = `https://www.alessandropezzali.it/MapsAPP/`. Così l'app è
+distinta da qualsiasi altra PWA sul dominio e la finestra mostra solo "Maps APP".
+
+Dopo l'aggiornamento conviene disinstallare e reinstallare l'app su Windows una volta, perché
+Windows memorizza l'identità al momento dell'installazione: disinstalla dalla finestra (o da
+chrome://apps), Ctrl+Maiusc+R sul sito, poi reinstalla. Da lì il titolo sarà corretto.
+
+sw.js: cache v14.15.

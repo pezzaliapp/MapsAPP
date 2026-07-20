@@ -1,9 +1,9 @@
 {
-  "id": "./",
+  "id": "https://www.alessandropezzali.it/MapsAPP/",
   "name": "Maps APP",
   "short_name": "Maps APP",
-  "start_url": "./",
-  "scope": "./",
+  "start_url": "https://www.alessandropezzali.it/MapsAPP/",
+  "scope": "https://www.alessandropezzali.it/MapsAPP/",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#f3f4f6",

@@ -213,7 +213,7 @@ const DAY=86400000;
 
 function monthsSince(t){return t?Math.max(0,Math.round((REF_END-t)/(30.44*DAY))):null}
 
-const APP_VERSION='v14.14';
+const APP_VERSION='v14.15';
 function setVerBadge(txt,cls){const el=$('#verBadge');if(!el)return;el.textContent=txt;el.className='ver'+(cls?' '+cls:'')}
 function showUpdateBanner(){updatePending=true;refreshInstallUI();if($('#updBanner'))return;const d=document.createElement('div');d.id='updBanner';d.className='upd-banner';
  d.innerHTML=`<span>È disponibile una versione più recente di Maps APP.</span><button type="button" id="updNow">Aggiorna ora</button>`;
@@ -222,7 +222,7 @@ function showUpdateBanner(){updatePending=true;refreshInstallUI();if($('#updBann
    if('serviceWorker'in navigator){const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs)await r.unregister()}}catch(e){}
   // ricarico su un URL con bypass della cache HTTP, altrimenti il browser rispolvera i file vecchi
   location.replace(location.pathname+'?fresh='+Date.now())};}
-const SW_EXPECTED='maps-app-v14-14-rel';
+const SW_EXPECTED='maps-app-v14-15-rel';
 async function checkVersion(){setVerBadge(APP_VERSION);
  try{const res=await fetch('sw.js?ts='+Date.now(),{cache:'no-store'});const m=/const CACHE='([^']+)'/.exec(await res.text());
   if(m&&m[1]!==SW_EXPECTED){setVerBadge(APP_VERSION+' \u2022 disponibile: '+m[1].replace('maps-app-',''),'stale');showUpdateBanner()}}catch(e){}}
