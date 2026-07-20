@@ -834,3 +834,32 @@ browser già installata, iPhone Safari, iPhone da schermata Home) — il pulsant
 Installa / Disinstalla / nulla come atteso in ciascuno.
 
 sw.js: cache v14.7.
+
+## v14.8 — Le nuove versioni non venivano applicate (restava la vecchia in cache)
+
+Segnalazione con schermata: il badge diceva "v14.6 · sul server: v14-7", cioè l'app sapeva
+che sul server c'era una versione più recente ma continuava a eseguire quella vecchia. Le
+correzioni c'erano, ma non si vedevano.
+
+**Causa.** Essendo una PWA, il service worker tiene in cache tutti i file. Il controllo
+versione (`checkVersion`) rilevava la versione nuova via rete e lo scriveva nel badge, ma
+**non offriva il pulsante per aggiornare**: si limitava al testo. Il banner "Aggiorna ora"
+esisteva, ma partiva solo se l'evento `updatefound` scattava durante la sessione — cosa che
+in un'app installata e già aperta spesso non avviene. Risultato: sapevi che c'era una
+versione nuova ma non avevi modo di applicarla dall'interfaccia.
+
+**Correzione.**
+- Quando `checkVersion` rileva una versione diversa sul server, ora **mostra direttamente il
+  banner "Aggiorna ora"**, senza aspettare `updatefound`.
+- Il pulsante "Aggiorna ora" ora **svuota tutte le cache**, sregistra i service worker e
+  ricarica: non può più restare bloccato sulla versione vecchia.
+- La registrazione controlla gli aggiornamenti ogni 60 secondi (`reg.update()`), e quando un
+  nuovo service worker prende il controllo la pagina si ricarica una volta sola
+  (`controllerchange`, con guardia anti-loop).
+
+**Per uscire dal blocco la prima volta** (l'app installata sulla v14.6 non ha ancora questo
+codice): nell'app installata, menu ⋮ in alto a destra → ricarica; se non basta, chiudere del
+tutto la finestra dell'app e riaprirla. In estrema ratio, disinstallare e reinstallare.
+Da questa versione in poi, il banner "Aggiorna ora" farà tutto da solo.
+
+sw.js: cache v14.8.

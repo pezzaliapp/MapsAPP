@@ -213,16 +213,18 @@ const DAY=86400000;
 
 function monthsSince(t){return t?Math.max(0,Math.round((REF_END-t)/(30.44*DAY))):null}
 
-const APP_VERSION='v14.7';
+const APP_VERSION='v14.8';
 function setVerBadge(txt,cls){const el=$('#verBadge');if(!el)return;el.textContent=txt;el.className='ver'+(cls?' '+cls:'')}
 function showUpdateBanner(){if($('#updBanner'))return;const d=document.createElement('div');d.id='updBanner';d.className='upd-banner';
  d.innerHTML=`<span>È disponibile una versione più recente di Maps APP.</span><button type="button" id="updNow">Aggiorna ora</button>`;
- document.body.appendChild(d);$('#updNow').onclick=async()=>{if('serviceWorker'in navigator){const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs)await r.unregister()}location.reload(true)};
- setVerBadge(APP_VERSION+' · aggiornamento pronto','stale')}
-const SW_EXPECTED='maps-app-v14-7-install-btn';
+ document.body.appendChild(d);$('#updNow').onclick=async()=>{const b=$('#updNow');if(b){b.disabled=true;b.textContent='Aggiornamento…'}
+  try{if('caches'in window){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}
+   if('serviceWorker'in navigator){const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs)await r.unregister()}}catch(e){}
+  location.reload(true)};}
+const SW_EXPECTED='maps-app-v14-8-update-fix';
 async function checkVersion(){setVerBadge(APP_VERSION);
  try{const res=await fetch('sw.js?ts='+Date.now(),{cache:'no-store'});const m=/const CACHE='([^']+)'/.exec(await res.text());
-  if(m&&m[1]!==SW_EXPECTED)setVerBadge(APP_VERSION+' \u2022 sul server: '+m[1].replace('maps-app-',''),'stale')}catch(e){}}
+  if(m&&m[1]!==SW_EXPECTED){setVerBadge(APP_VERSION+' \u2022 disponibile: '+m[1].replace('maps-app-',''),'stale');showUpdateBanner()}}catch(e){}}
 const TOP_12M=20000,CALO_RATIO=0.6,CALO_MIN=3000;
 
 function monthsSince(t){return t?Math.max(0,Math.round((REF_END-t)/(30.44*DAY))):null}
@@ -576,7 +578,8 @@ $('#installBtn').onclick=async()=>{
   if(deferredPrompt){deferredPrompt.prompt();const{outcome}=await deferredPrompt.userChoice;deferredPrompt=null;if(outcome==='accepted')installed=true;refreshInstallUI();return}
   if(isIOS()){alert('Per installare su iPhone/iPad:\n\n1. Apri questa pagina in Safari\n2. Tocca il pulsante Condividi (quadrato con freccia)\n3. Scorri e tocca “Aggiungi a schermata Home”\n4. Conferma con “Aggiungi”');return}
   alert('Per installare l’app:\n\n• Chrome/Edge: menu ⋮ → “Installa Maps APP” (o icona di installazione nella barra degli indirizzi)\n• Firefox: non supporta l’installazione PWA su desktop\n\nNota: serve HTTPS (o localhost). Se la voce non compare, ricarica la pagina e riprova.')};
-(async()=>{await load();initMap();render();if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').then(reg=>{
+(async()=>{await load();initMap();render();if('serviceWorker'in navigator){let reloaded=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloaded)return;reloaded=true;location.reload()});}
+if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').then(reg=>{setInterval(()=>reg.update().catch(()=>{}),60000);
  reg.addEventListener('updatefound',()=>{const w=reg.installing;if(!w)return;w.addEventListener('statechange',()=>{if(w.state==='installed'&&navigator.serviceWorker.controller)showUpdateBanner()})});
  reg.update().catch(()=>{});setInterval(()=>reg.update().catch(()=>{}),60*60*1000);
  checkVersion()}).catch(e=>console.warn('SW',e));else setVerBadge('no SW')})();
