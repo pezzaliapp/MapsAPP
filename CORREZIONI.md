@@ -863,3 +863,35 @@ tutto la finestra dell'app e riaprirla. In estrema ratio, disinstallare e reinst
 Da questa versione in poi, il banner "Aggiorna ora" farà tutto da solo.
 
 sw.js: cache v14.8.
+
+## v14.9 — iPhone: header sotto la barra di stato; nota su Windows
+
+### iPhone: intestazione coperta da orologio e batteria
+Segnalazione con schermata: sull'app installata su iPhone il titolo, la versione e il
+pulsante Disinstalla finivano sotto la barra di stato (orologio, batteria).
+
+**Causa.** L'header aveva `height:60px` e `padding` fissi, senza tenere conto della "zona
+sicura" dell'iPhone (notch / barra di stato). Il viewport aveva già `viewport-fit=cover`,
+quindi bastava usare le variabili `env(safe-area-inset-*)`.
+
+**Correzione.** L'header ora usa `min-height` invece di altezza fissa e aggiunge
+`env(safe-area-inset-top/left/right)` al padding: il contenuto scende sotto la barra di
+stato su iPhone, e resta invariato su desktop (dove quei valori sono 0). Stessa cosa per il
+banner "Aggiorna ora", che ora tiene conto di `safe-area-inset-bottom` per non finire sotto
+la barra home.
+
+### Windows: "non è cambiato nulla"
+Non è un difetto nuovo: è lo stesso blocco di cache già visto sul Mac. Il portatile Windows
+esegue una versione precedente alla v14.8, che non ha ancora il banner "Aggiorna ora", quindi
+resta sulla cache vecchia. Che sul Mac ora funzioni conferma che i file nuovi sono online: è
+solo Windows a servire il vecchio. Va sbloccato una volta a mano (vedi sotto); da lì in poi
+il banner farà da sé.
+
+**Sbloccare su Windows (Chrome/Edge), una volta:**
+1. Nell'app installata, premere Ctrl+Maiusc+R (ricarica forzata). Spesso basta.
+2. Se non basta: chiudere l'app, riaprirla, e alla comparsa del banner premere "Aggiorna ora".
+3. In estrema ratio: aprire nel browser `edge://apps` o `chrome://apps`, rimuovere Maps APP e
+   reinstallarla dal sito.
+Dopo il primo sblocco alla v14.8+, gli aggiornamenti successivi si applicano da soli.
+
+sw.js: cache v14.9.

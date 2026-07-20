@@ -213,7 +213,7 @@ const DAY=86400000;
 
 function monthsSince(t){return t?Math.max(0,Math.round((REF_END-t)/(30.44*DAY))):null}
 
-const APP_VERSION='v14.8';
+const APP_VERSION='v14.9';
 function setVerBadge(txt,cls){const el=$('#verBadge');if(!el)return;el.textContent=txt;el.className='ver'+(cls?' '+cls:'')}
 function showUpdateBanner(){if($('#updBanner'))return;const d=document.createElement('div');d.id='updBanner';d.className='upd-banner';
  d.innerHTML=`<span>È disponibile una versione più recente di Maps APP.</span><button type="button" id="updNow">Aggiorna ora</button>`;
@@ -221,7 +221,7 @@ function showUpdateBanner(){if($('#updBanner'))return;const d=document.createEle
   try{if('caches'in window){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}
    if('serviceWorker'in navigator){const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs)await r.unregister()}}catch(e){}
   location.reload(true)};}
-const SW_EXPECTED='maps-app-v14-8-update-fix';
+const SW_EXPECTED='maps-app-v14-9-safe-area';
 async function checkVersion(){setVerBadge(APP_VERSION);
  try{const res=await fetch('sw.js?ts='+Date.now(),{cache:'no-store'});const m=/const CACHE='([^']+)'/.exec(await res.text());
   if(m&&m[1]!==SW_EXPECTED){setVerBadge(APP_VERSION+' \u2022 disponibile: '+m[1].replace('maps-app-',''),'stale');showUpdateBanner()}}catch(e){}}
