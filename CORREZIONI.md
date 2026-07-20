@@ -1051,23 +1051,3 @@ Windows memorizza l'identità al momento dell'installazione: disinstalla dalla f
 chrome://apps), Ctrl+Maiusc+R sul sito, poi reinstalla. Da lì il titolo sarà corretto.
 
 sw.js: cache v14.15.
-
-## v14.16 (su base v14.15 dell'utente) — Verde = crescita 2026 vs 2025; viola = finanziarie
-
-Ripartito dallo zip funzionante dell'utente (v14.15), toccando SOLO colori/tipo attività.
-Logica di caricamento, salvataggio, import, agenti e marker: NON toccata.
-
-- VERDE = cliente in crescita nell'anno in corso: confronto 2026 (1 gen -> data di riferimento)
-  vs 2025 nello STESSO periodo (a pari data). Verde se: 2026 >= 5.000 EUR, crescita >= 3.000 EUR
-  e >= +10% sul 2025. Clienti ripartiti da zero: verdi se 2026 >= 3.000 EUR. Sostituisce la
-  vecchia regola "20k negli ultimi 12 mesi" (che rendeva verde chi aveva comprato molto fino a
-  un anno prima ma era fermo, es. SEMERARO).
-- VIOLA = societa finanziarie/leasing/noleggio. Nuovo tipo attivita "Finanziaria / Leasing /
-  Noleggio", colore viola dedicato, riconoscimento anche dal nome (LEASING/RENT/NOLEGGIO...),
-  sempre fuori da verde/calo e dalle classifiche.
-- Legenda aggiornata.
-
-Test: logica colori verificata (ZAMMARCHI verde, SEMERARO no, BCC/ALBA viola); apertura +
-salvataggio + rilettura del backup (1788 clienti) verificati -> i dati non si rompono.
-
-sw.js: cache v14.16.
