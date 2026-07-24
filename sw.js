@@ -1,4 +1,4 @@
-const CACHE='maps-app-v14-16-rel';
+const CACHE='maps-app-v14-17-rel';
 const ASSETS=['./','index.html','style.css','app.js','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/icon-512-maskable.png','icons/apple-touch-icon.png','vendor/jszip.min.js'];
 
 // Niente skipWaiting automatico: il codice non deve cambiare sotto i piedi dell'utente

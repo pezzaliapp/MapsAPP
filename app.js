@@ -69,6 +69,7 @@ async function persistNow(verifica){
   // se non esiste ancora un backup (primo salvataggio su questo dispositivo) lo semino adesso,
   // altrimenti un'eviction del browser lascerebbe l'agente senza nessuna rete di sicurezza
   try{const b=await idbGet(db,DB_KEY_BACKUP);if((!b||!b.clients||!Object.keys(b.clients).length)&&atteso)await idbPut(db,DB_KEY_BACKUP,back||project)}catch(e){console.warn('seed backup',e)}
+  scriviSentinella();
   return letto
  }finally{try{db.close()}catch(e){}pendingWrites--;drainReload()}
 }
@@ -128,6 +129,86 @@ async function load(){
   storageAlert(e,'I dati salvati sono presenti ma non sono riuscito ad aprirli. Non importare nulla: segnala il problema.')
  }
 }
+
+// ---------------------------------------------------------------------------
+// Progetto agganciato al link.
+// Se il browser dell'agente cancella l'archivio (Safari lo fa con i siti non
+// installati, e le anteprime interne di WhatsApp/Gmail lo azzerano a ogni
+// chiusura), riaprire il link ricarica da solo il progetto: nessun file da
+// ritrovare, nessun passaggio manuale.
+//   ...index.html?agente=dolce   ->  agenti/dolce.json
+//   ...index.html?data=percorso/file.json
+// ---------------------------------------------------------------------------
+function urlProgetto(){
+ try{
+  const u=new URL(location.href);
+  const ag=u.searchParams.get('agente'),dt=u.searchParams.get('data');
+  const rel=dt||(ag?('agenti/'+ag.toLowerCase().replace(/[^a-z0-9_-]/g,'')+'.json'):null);
+  if(!rel)return null;
+  const url=new URL(rel,location.href);
+  if(url.origin!==location.origin)return null;   // solo file pubblicati insieme alla app
+  return url.href
+ }catch(e){return null}
+}
+async function scaricaProgetto(url){
+ const r=await fetch(url,{cache:'no-cache'});
+ if(!r.ok)throw new Error('HTTP '+r.status);
+ const p=await r.json();
+ if(!p||!p.clients)throw new Error('il file agganciato al link non contiene un progetto');
+ return p
+}
+async function caricaDaLink(){
+ const url=urlProgetto();
+ if(!url)return false;
+ const locali=Object.keys(project.clients||{}).length;
+ let p;
+ try{p=await scaricaProgetto(url)}
+ catch(e){
+  console.warn('progetto da link non disponibile',e);
+  if(!locali)storageAlert(e,'Non riesco a scaricare il progetto agganciato al link: '+(e&&e.message||e));
+  return false
+ }
+ const n=Object.keys(p.clients).length;
+ if(!locali){
+  // archivio vuoto: primo accesso oppure dati cancellati dal browser. Ricarico e basta.
+  const perso=sentinellaDiceCheAvevoDati();   // va letta PRIMA di salvare, il salvataggio la riscrive
+  adoptProject(p);
+  try{await persistProject(true)}catch(e){console.warn('salvataggio non riuscito',e)}
+  render();if(map)fit();
+  $('#status').textContent=perso
+   ? `Il browser aveva cancellato i dati: ho ricaricato il progetto dal link (${n} clienti).`
+   : `Progetto caricato dal link: ${n} clienti.`;
+  return true
+ }
+ // ho gia' dati miei: non tocco niente senza permesso
+ const mio=Date.parse(project.updatedAt||0)||0,suo=Date.parse(p.updatedAt||0)||0;
+ if(suo>mio)mostraAggiornamentoDaLink(p,n);
+ return false
+}
+function mostraAggiornamentoDaLink(p,n){
+ if(document.getElementById('linkBanner'))return;
+ const d=document.createElement('div');d.id='linkBanner';d.className='upd-banner';
+ d.innerHTML='<span>\u00c8 disponibile una versione pi\u00f9 recente del progetto ('+n+' clienti, '+new Date(p.updatedAt).toLocaleString('it-IT')+').</span><button type="button" id="linkMerge">Unisci</button><button type="button" id="linkOpen">Sostituisci</button><button type="button" id="linkNo">No</button>';
+ document.body.appendChild(d);
+ document.getElementById('linkNo').onclick=()=>d.remove();
+ document.getElementById('linkMerge').onclick=async()=>{d.remove();mergeProject(p);await save()};
+ document.getElementById('linkOpen').onclick=async()=>{
+  if(!confirm('Sostituisci il progetto attuale ('+Object.keys(project.clients||{}).length+' clienti) con quello del link ('+n+')?'))return;
+  d.remove();adoptProject(p);try{await persistProject(true);render();if(map)fit()}catch(e){storageAlert(e)}
+ }
+}
+// Sentinella: un promemoria minuscolo in localStorage. Se dice che avevo dei clienti
+// ma IndexedDB e' vuoto, il browser ha cancellato l'archivio: e' l'unico modo per
+// distinguere "non ho mai salvato" da "me l'hanno cancellato".
+function scriviSentinella(){try{localStorage.setItem('maps-app-sentinella',JSON.stringify({n:Object.keys(project.clients||{}).length,t:Date.now()}))}catch(e){}}
+function sentinellaDiceCheAvevoDati(){try{const v=JSON.parse(localStorage.getItem('maps-app-sentinella')||'null');return !!(v&&v.n>0)}catch(e){return false}}
+function avvisaSeDatiCancellati(){
+ if(Object.keys(project.clients||{}).length)return;
+ if(!sentinellaDiceCheAvevoDati())return;
+ let v=null;try{v=JSON.parse(localStorage.getItem('maps-app-sentinella'))}catch(e){}
+ alert('Il browser ha cancellato i dati salvati su questo dispositivo.\n\nL\u2019ultimo salvataggio ('+(v&&v.n)+' clienti, '+new Date(v&&v.t).toLocaleString('it-IT')+') non c\u2019\u00e8 pi\u00f9: non \u00e8 un errore della app, \u00e8 il sistema che libera spazio sui siti non installati.\n\nPer evitarlo: aggiungi Maps APP alla schermata Home (Condividi \u2192 Aggiungi a schermata Home) e riapri sempre da quell\u2019icona.');
+}
+
 function storageAlert(e,testo){
  const el=$('#status');
  const msg=testo||('Salvataggio non riuscito: '+(e&&e.message||e));
@@ -352,7 +433,7 @@ const DAY=86400000;
 
 function monthsSince(t){return t?Math.max(0,Math.round((REF_END-t)/(30.44*DAY))):null}
 
-const APP_VERSION='v14.16';
+const APP_VERSION='v14.17';
 function setVerBadge(txt,cls){const el=$('#verBadge');if(!el)return;el.textContent=txt;el.className='ver'+(cls?' '+cls:'')}
 function showUpdateBanner(){updatePending=true;refreshInstallUI();if($('#updBanner'))return;const d=document.createElement('div');d.id='updBanner';d.className='upd-banner';
  d.innerHTML=`<span>È disponibile una versione più recente di Maps APP.</span><button type="button" id="updNow">Aggiorna ora</button>`;
@@ -363,7 +444,7 @@ function showUpdateBanner(){updatePending=true;refreshInstallUI();if($('#updBann
    if('serviceWorker'in navigator){const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs)await r.unregister()}}catch(e){}
   // ricarico su un URL con bypass della cache HTTP, altrimenti il browser rispolvera i file vecchi
   location.replace(location.pathname+'?fresh='+Date.now())};}
-const SW_EXPECTED='maps-app-v14-16-rel';
+const SW_EXPECTED='maps-app-v14-17-rel';
 async function checkVersion(){setVerBadge(APP_VERSION);
  try{const res=await fetch('sw.js?ts='+Date.now(),{cache:'no-store'});const m=/const CACHE='([^']+)'/.exec(await res.text());
   if(m&&m[1]!==SW_EXPECTED){setVerBadge(APP_VERSION+' \u2022 disponibile: '+m[1].replace('maps-app-',''),'stale');showUpdateBanner()}}catch(e){}}
@@ -744,6 +825,8 @@ async function diagnostica(){
    L.push('Spazio usato: '+Math.round((e2.usage||0)/1048576)+' MB su '+Math.round((e2.quota||0)/1048576)+' MB');
   }
  }catch(e){}
+ L.push('Progetto agganciato al link: '+(urlProgetto()||'nessuno'));
+ try{const v=localStorage.getItem('maps-app-sentinella');L.push('Ultimo salvataggio noto: '+(v||'mai'))}catch(e){L.push('localStorage non accessibile')}
  L.push('Service worker: '+(('serviceWorker'in navigator)?(navigator.serviceWorker.controller?'attivo':'non ancora attivo'):'non supportato'));
  L.push('Scritture in corso: '+pendingWrites+(loadFailed?' \u2014 SCRITTURE BLOCCATE (lettura fallita all\u2019avvio)':''));
  const testo=L.join('\n');
@@ -814,7 +897,7 @@ function armSwReload(){
   reloadWanted=true;drainReload()      // aggiornamento vero: ricarico, ma solo a scritture concluse
  })
 }
-(async()=>{await load();initMap();render();await requestPersistentStorage();warnIfStorageVolatile();armSwReload();
+(async()=>{await load();initMap();render();await requestPersistentStorage();const daLink=await caricaDaLink();if(!daLink)avvisaSeDatiCancellati();warnIfStorageVolatile();armSwReload();
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js?v='+SW_EXPECTED).then(reg=>{setInterval(()=>reg.update().catch(()=>{}),60000);
  reg.addEventListener('updatefound',()=>{const w=reg.installing;if(!w)return;w.addEventListener('statechange',()=>{if(w.state==='installed'&&navigator.serviceWorker.controller)showUpdateBanner()})});
  reg.update().catch(()=>{});setInterval(()=>reg.update().catch(()=>{}),60*60*1000);
