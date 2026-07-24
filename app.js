@@ -139,6 +139,17 @@ async function load(){
 //   ...index.html?agente=dolce   ->  agenti/dolce.json
 //   ...index.html?data=percorso/file.json
 // ---------------------------------------------------------------------------
+// I conteggi di import vanno ricalcolati sul sottoinsieme: altrimenti l'agente si
+// vede scritto "vendite: 48779 righe" mentre ne ha 761, ed e' solo confusione.
+function subsetImports(cs){
+ const src=project.imports||{},out={};
+ const righe={clienti:cs.length,
+  ordini:cs.reduce((s,c)=>s+((c.orderLines||[]).length),0),
+  vendite:cs.reduce((s,c)=>s+((c.saleLines||[]).length),0)};
+ for(const k of ['clienti','ordini','vendite'])if(src[k])out[k]={...src[k],rows:righe[k]};
+ out.clientiCount=cs.length;
+ return out
+}
 function urlProgetto(){
  try{
   const u=new URL(location.href);
@@ -610,6 +621,7 @@ function exportShare(){const cs=shareClients();if(!cs.length)return;
   clients:Object.fromEntries(cs.map(c=>[c.id,c])),
   tour:(project.tour||[]).filter(i=>ids.has(i)),
   emailsOff:(project.emailsOff||[]).filter(k=>ids.has(String(k).split('|')[0])),
+  imports:subsetImports(cs),
   subset:{agents:[...shareSel.agents],regions:[...shareSel.regions],clients:cs.length,date:new Date().toISOString(),from:'Maps APP '+APP_VERSION}};
  const nome=[...shareSel.agents,...shareSel.regions].join('-').replace(/[^\w\-]+/g,'_').slice(0,40)||'selezione';
  download(`maps-app_${nome}_${new Date().toISOString().slice(0,10)}.json`,JSON.stringify(sub,null,2));
