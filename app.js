@@ -11,12 +11,151 @@ const normHeader=s=>norm(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').repl
 const canonId=v=>{const s=norm(v).toUpperCase();if(!s)return'';const compact=s.replace(/\s/g,'');const d=compact.replace(/\D/g,'');if(d&&d===compact)return d.replace(/^0+/,'').padStart(5,'0');return s};
 const num=v=>{if(typeof v==='number')return Number.isFinite(v)?v:0;const s=String(v??'').trim().replace(/\./g,'').replace(',','.');const n=Number(s);return Number.isFinite(n)?n:0};
 const excelDate=v=>{if(!v)return'';if(typeof v==='number'||/^\d+(\.\d+)?$/.test(String(v))){const n=Number(v);const d=new Date(Date.UTC(1899,11,30)+n*86400000);return `${String(d.getUTCDate()).padStart(2,'0')}/${String(d.getUTCMonth()+1).padStart(2,'0')}/${d.getUTCFullYear()}`}return String(v)};
-function openDb(){return new Promise((resolve,reject)=>{const req=indexedDB.open(DB_NAME,1);req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(DB_STORE))db.createObjectStore(DB_STORE)};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
-async function persistProject(){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(DB_STORE,'readwrite');tx.objectStore(DB_STORE).put(project,DB_KEY);tx.oncomplete=()=>{db.close();resolve()};tx.onerror=()=>{db.close();reject(tx.error)}})}
-async function readProject(){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(DB_STORE,'readonly');const req=tx.objectStore(DB_STORE).get(DB_KEY);req.onsuccess=()=>{db.close();resolve(req.result)};req.onerror=()=>{db.close();reject(req.error)}})}
-async function save(){project.updatedAt=new Date().toISOString();try{await persistProject()}catch(e){console.error('IndexedDB',e);throw e}render()}
-async function load(){try{let p=await readProject();if(!p){const legacy=localStorage.getItem(LEGACY_KEY);if(legacy){p=JSON.parse(legacy);project=p;await persistProject();localStorage.removeItem(LEGACY_KEY)}}if(p?.clients){project=p;migrateAgentBase();project.tour??=[];project.tourStart??=null;project.emailsOff??=[];project.tourStartLabel??='';for(const c of Object.values(project.clients)){c.orderLines??=[];c.saleLines??=[];c.saleYears??={}}const before=Object.keys(project.clients).length;migrateClients();if(Object.keys(project.clients).length!==before)await persistProject()}}catch(e){console.warn(e)}}
-function migrateClients(){const merged={};for(const[k,c]of Object.entries(project.clients)){const id=canonId(k)||k;if(!merged[id]){merged[id]={...c,id};continue}const t=merged[id];t.name=t.name||c.name;t.address=t.address||c.address;t.city=t.city||c.city;t.cap=t.cap||c.cap;t.province=t.province||c.province;t.agent=t.agent||c.agent;t.agentCode=t.agentCode||c.agentCode;t.abc=t.abc||c.abc;t.payment=t.payment||c.payment;t.note=[t.note,c.note].filter(Boolean).join('\n');t.orders=(t.orders||0)+(c.orders||0);t.sales=(t.sales||0)+(c.sales||0);t.orderLines=[...(t.orderLines||[]),...(c.orderLines||[])];t.saleLines=[...(t.saleLines||[]),...(c.saleLines||[])];for(const[y,v]of Object.entries(c.saleYears||{}))t.saleYears[y]=(t.saleYears[y]||0)+v;t.emails=[...new Set([...(t.emails||[]),...(c.emails||[])])];t.phones=[...new Set([...(t.phones||[]),...(c.phones||[])])];if(t.lat==null&&c.lat!=null){t.lat=c.lat;t.lng=c.lng;t.manualPosition=c.manualPosition}}project.clients=merged}
+const DB_KEY_BACKUP='backup';
+const NORM_VERSION=3;   // cambia solo quando cambia la forma dei dati normalizzati
+let loadFailed=false;          // true se non sono riuscito a leggere l'archivio: blocca le scritture
+let pendingWrites=0;           // scritture in volo: impedisce il reload del service worker
+let storagePersisted=null;     // esito di navigator.storage.persist()
+let saveQueue=Promise.resolve();// serializza le scritture: niente transazioni concorrenti
+function openDb(){return new Promise((resolve,reject)=>{
+ let req,done=false;
+ const fail=e=>{if(done)return;done=true;reject(e instanceof Error?e:new Error(String(e&&e.message||e||'IndexedDB non disponibile')))};
+ const ok=db=>{if(done)return;done=true;resolve(db)};
+ try{req=indexedDB.open(DB_NAME,1)}catch(e){return fail(e)}
+ req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(DB_STORE))db.createObjectStore(DB_STORE)};
+ req.onsuccess=()=>{const db=req.result;db.onversionchange=()=>db.close();ok(db)};
+ req.onerror=()=>fail(req.error||new Error('IndexedDB non disponibile (navigazione privata?)'));
+ req.onblocked=()=>fail(new Error('Archivio bloccato da un\u2019altra scheda di Maps APP: chiudi le altre schede e riprova.'));
+ setTimeout(()=>fail(new Error('IndexedDB non risponde. Su iPhone/iPad succede in navigazione privata: apri la app in una scheda normale.')),10000)
+})}
+function idbPut(db,key,value){return new Promise((resolve,reject)=>{
+ let tx;
+ try{tx=db.transaction(DB_STORE,'readwrite')}catch(e){return reject(e)}
+ try{tx.objectStore(DB_STORE).put(value,key)}catch(e){try{tx.abort()}catch(_){}return reject(e)}
+ tx.oncomplete=()=>resolve();
+ tx.onerror=()=>reject(tx.error||new Error('scrittura non riuscita'));
+ tx.onabort=()=>reject(tx.error||new Error('scrittura interrotta (spazio esaurito?)'))
+})}
+function idbGet(db,key){return new Promise((resolve,reject)=>{
+ let tx;
+ try{tx=db.transaction(DB_STORE,'readonly')}catch(e){return reject(e)}
+ const req=tx.objectStore(DB_STORE).get(key);
+ req.onsuccess=()=>resolve(req.result);
+ req.onerror=()=>reject(req.error||new Error('lettura non riuscita'))
+})}
+// Scrive il progetto e RILEGGE per confermare: senza verifica non si pu\u00f2 dire all'utente "salvato".
+async function persistNow(verifica){
+ if(loadFailed)throw new Error('Salvataggio bloccato: l\u2019archivio locale non \u00e8 stato letto correttamente all\u2019avvio. Ricarica la app prima di modificare i dati, altrimenti rischi di sovrascrivere quelli buoni.');
+ pendingWrites++;
+ const db=await openDb();
+ try{
+  // il vecchio progetto diventa backup: se un "Apri progetto" sbagliato sostituisce tutto, si recupera
+  try{const prev=await idbGet(db,DB_KEY);if(prev&&prev.clients&&Object.keys(prev.clients).length)await idbPut(db,DB_KEY_BACKUP,prev)}catch(e){console.warn('backup non riuscito',e)}
+  try{await idbPut(db,DB_KEY,project)}
+  catch(e){
+   // DataCloneError: qualcosa nel progetto non \u00e8 clonabile. Ripulisco passando da JSON e riprovo.
+   if(String(e&&e.name)!=='DataCloneError')throw e;
+   console.warn('DataCloneError: riprovo con una copia serializzata',e);
+   await idbPut(db,DB_KEY,JSON.parse(JSON.stringify(project)))
+  }
+  const atteso=Object.keys(project.clients||{}).length;
+  let back=null,letto=atteso;
+  if(verifica){
+   back=await idbGet(db,DB_KEY);
+   letto=Object.keys((back&&back.clients)||{}).length;
+   if(!back)throw new Error('salvataggio non confermato: rileggendo l\u2019archivio non c\u2019\u00e8 nulla');
+   if(letto!==atteso)throw new Error(`salvataggio incompleto: salvati ${letto} clienti su ${atteso}`);
+  }
+  // se non esiste ancora un backup (primo salvataggio su questo dispositivo) lo semino adesso,
+  // altrimenti un'eviction del browser lascerebbe l'agente senza nessuna rete di sicurezza
+  try{const b=await idbGet(db,DB_KEY_BACKUP);if((!b||!b.clients||!Object.keys(b.clients).length)&&atteso)await idbPut(db,DB_KEY_BACKUP,back||project)}catch(e){console.warn('seed backup',e)}
+  return letto
+ }finally{try{db.close()}catch(e){}pendingWrites--;drainReload()}
+}
+function persistProject(verifica){const run=()=>persistNow(verifica);saveQueue=saveQueue.then(run,run);return saveQueue}
+async function readProject(){const db=await openDb();try{return await idbGet(db,DB_KEY)}finally{try{db.close()}catch(e){}}}
+async function readBackup(){const db=await openDb();try{return await idbGet(db,DB_KEY_BACKUP)}finally{try{db.close()}catch(e){}}}
+// Applica TUTTI i valori di default e le migrazioni. Prima esisteva solo dentro load(),
+// quindi un progetto aperto da file finiva in archivio in una forma diversa da quella attesa.
+function adoptProject(p){
+ if(!p||typeof p!=='object'||!p.clients||typeof p.clients!=='object')throw new Error('Il file non contiene un progetto Maps APP (manca l\u2019elenco clienti).');
+ p.version??=2;p.imports??={};p.tour??=[];p.tourStart??=null;p.tourStartLabel??='';p.tourStartGps??=false;p.emailsOff??=[];
+ if(!Array.isArray(p.tour))p.tour=[];
+ if(!Array.isArray(p.emailsOff))p.emailsOff=[];
+ for(const[k,c]of Object.entries(p.clients)){
+  if(!c||typeof c!=='object'){delete p.clients[k];continue}
+  c.id=norm(c.id)||canonId(k)||k;
+  c.orderLines??=[];c.saleLines??=[];c.saleYears??={};c.emails??=[];c.phones??=[];
+  if(!Array.isArray(c.orderLines))c.orderLines=[];
+  if(!Array.isArray(c.saleLines))c.saleLines=[];
+  if(!Array.isArray(c.emails))c.emails=[];
+  if(!Array.isArray(c.phones))c.phones=[];
+  if(!c.saleYears||typeof c.saleYears!=='object')c.saleYears={};
+  c.orders=num(c.orders);c.sales=num(c.sales)
+ }
+ project=p;migrateAgentBase();migrateClients();return project
+}
+async function save(){
+ project.updatedAt=new Date().toISOString();
+ try{await persistProject()}
+ catch(e){console.error('IndexedDB',e);storageAlert(e);throw e}
+ render()
+}
+async function load(){
+ let p=null,daBackup=false;
+ try{p=await readProject()}
+ catch(e){
+  loadFailed=true;console.error('Lettura archivio locale non riuscita',e);
+  storageAlert(e,'Non riesco a leggere i dati salvati su questo dispositivo. NON importare e non aprire nulla adesso: ricarica la pagina, cos\u00ec non rischi di sovrascrivere i dati buoni.');
+  return
+ }
+ try{
+  if(!p){const legacy=localStorage.getItem(LEGACY_KEY);if(legacy){p=JSON.parse(legacy);localStorage.removeItem(LEGACY_KEY)}}
+  if(!p||!p.clients||!Object.keys(p.clients).length){
+   const b=await readBackup().catch(()=>null);
+   if(b&&b.clients&&Object.keys(b.clients).length){p=b;daBackup=true;console.warn('Archivio principale vuoto: ripristino dal backup')}
+  }
+  if(p&&p.clients){
+   const eraNormalizzato=p.normVersion===NORM_VERSION;
+   adoptProject(p);
+   // riscrive in forma normalizzata solo se serve: cosi' l'archivio non resta mai
+   // in uno stato "grezzo", ma l'avvio non ricopia 30 MB a ogni apertura
+   if(!eraNormalizzato)await persistProject()
+   if(daBackup)setTimeout(()=>alert('I dati principali non c\u2019erano pi\u00f9: ho ripristinato la copia di sicurezza interna ('+Object.keys(project.clients).length+' clienti). Esporta subito il progetto per sicurezza.'),400)
+  }
+ }catch(e){
+  loadFailed=true;console.error('Archivio illeggibile',e);
+  storageAlert(e,'I dati salvati sono presenti ma non sono riuscito ad aprirli. Non importare nulla: segnala il problema.')
+ }
+}
+function storageAlert(e,testo){
+ const el=$('#status');
+ const msg=testo||('Salvataggio non riuscito: '+(e&&e.message||e));
+ if(el){el.textContent=msg;el.style.color='#b91c1c';el.style.fontWeight='700'}
+ console.error(msg,e)
+}
+// Chiede al browser di NON cancellare i dati. Senza questa chiamata Safari/iOS
+// tratta l'archivio come "best effort" e lo pu\u00f2 buttare via da un momento all'altro.
+async function requestPersistentStorage(){
+ try{
+  if(!navigator.storage||!navigator.storage.persist){storagePersisted=null;return null}
+  if(await navigator.storage.persisted()){storagePersisted=true;return true}
+  storagePersisted=await navigator.storage.persist();
+  return storagePersisted
+ }catch(e){storagePersisted=null;return null}
+}
+function warnIfStorageVolatile(){
+ if(storagePersisted!==false)return;
+ if(!Object.keys(project.clients||{}).length)return;
+ if(document.getElementById('volBanner'))return;
+ const standalone=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+ if(standalone)return;
+ const d=document.createElement('div');d.id='volBanner';d.className='upd-banner';
+ d.innerHTML='<span>Questi dati possono essere cancellati dal browser. Installa Maps APP (Condividi \u2192 Aggiungi a schermata Home) oppure esporta spesso il progetto.</span><button type="button" id="volClose">Ho capito</button>';
+ document.body.appendChild(d);
+ document.getElementById('volClose').onclick=()=>d.remove()
+}
+function migrateClients(){const merged={};for(const[k,c]of Object.entries(project.clients||{})){if(!c||typeof c!=='object')continue;const id=canonId(k)||k;if(!merged[id]){merged[id]={...c,id};continue}const t=merged[id];t.name=t.name||c.name;t.address=t.address||c.address;t.city=t.city||c.city;t.cap=t.cap||c.cap;t.province=t.province||c.province;t.agent=t.agent||c.agent;t.agentCode=t.agentCode||c.agentCode;t.abc=t.abc||c.abc;t.payment=t.payment||c.payment;t.note=[t.note,c.note].filter(Boolean).join('\n');t.orders=(t.orders||0)+(c.orders||0);t.sales=(t.sales||0)+(c.sales||0);t.orderLines=[...(t.orderLines||[]),...(c.orderLines||[])];t.saleLines=[...(t.saleLines||[]),...(c.saleLines||[])];t.saleYears||(t.saleYears={});for(const[y,v]of Object.entries(c.saleYears||{}))t.saleYears[y]=(t.saleYears[y]||0)+v;t.emails=[...new Set([...(t.emails||[]),...(c.emails||[])])];t.phones=[...new Set([...(t.phones||[]),...(c.phones||[])])];if(t.lat==null&&c.lat!=null){t.lat=c.lat;t.lng=c.lng;t.manualPosition=c.manualPosition}}project.clients=merged}
 function initMap(){if(typeof L==='undefined'){document.getElementById('map').innerHTML='<div style="padding:24px;text-align:center"><b>Mappa non disponibile.</b><br><small>Serve una connessione Internet per caricare la cartografia. L’importazione Excel funziona comunque.</small></div>';return}map=L.map('map').setView([42.5,12.5],6);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);markers=L.layerGroup().addTo(map);tourLayer=L.layerGroup().addTo(map)}
 function xmlText(node){return Array.from(node.getElementsByTagNameNS('*','t')).map(x=>x.textContent||'').join('')}
 function colIndex(ref,fallback=0){const m=String(ref??'').match(/[A-Z]+/);if(!m)return fallback;let n=0;for(const ch of m[0])n=n*26+ch.charCodeAt(0)-64;return n-1}
@@ -93,7 +232,7 @@ async function importFiles(files){
 }
 
 function ensure(id,name=''){id=canonId(id);if(!id||id==='00000')return null;return project.clients[id]??={id,name,emails:[],phones:[],orders:0,sales:0,orderLines:[],saleLines:[],saleYears:{},note:'',lat:null,lng:null,manualPosition:false}}
-function importClients(rows){const ak=agentDescKey(rows);const seen=new Set();for(const r of rows){const id=canonId(r['CLIENTE']);if(!id||id==='00000')continue;if(window.__seenClientIds)window.__seenClientIds.add(id);const rs=norm(r['RAGIONE SOCIALE 1']||r['RAGIONE SOCIALE']);const c=ensure(id,rs);c.name=rs||c.name;c.address=norm(r['INDIRIZZO']);c.city=norm(r['CITTA']||r['LOCALITA']||r['COMUNE']);c.cap=norm(r['CAP']).padStart(5,'0');c.province=norm(r['PROVINCIA']);c.agentCode=norm(r['AGENTE']);c.agent=(ak?norm(r[ak]):'')||(norm(r['AGENTE'])?`cod. ${norm(r['AGENTE'])}`:'');c.abc=norm(r['CLASSE ABC']);c.payment=norm(r['DESCRIZIONE ELEMENTO']);[r['NR.TELEFONICO'],r['NR.CELLULARE']].map(norm).filter(Boolean).forEach(x=>{if(!c.phones.includes(x))c.phones.push(x)});for(const em of splitEmails(r['EMAIL']))if(!c.emails.some(x=>x.toLowerCase()===em))c.emails.push(em);seen.add(id)}project.imports.clientiCount=seen.size}
+function importClients(rows){const ak=agentDescKey(rows);const seen=new Set();for(const r of rows){const id=canonId(r['CLIENTE']);if(!id||id==='00000')continue;if(window.__seenClientIds)window.__seenClientIds.add(id);const rs=norm(r['RAGIONE SOCIALE 1']||r['RAGIONE SOCIALE']);const c=ensure(id,rs);c.name=rs||c.name;c.address=norm(r['INDIRIZZO'])||c.address||'';c.city=norm(r['CITTA']||r['LOCALITA']||r['COMUNE'])||c.city||'';{const cap=norm(r['CAP']);c.cap=cap?cap.padStart(5,'0'):''}c.province=norm(r['PROVINCIA'])||c.province||'';c.agentCode=norm(r['AGENTE']);c.agent=(ak?norm(r[ak]):'')||(norm(r['AGENTE'])?`cod. ${norm(r['AGENTE'])}`:'');c.abc=norm(r['CLASSE ABC']);c.payment=norm(r['DESCRIZIONE ELEMENTO']);[r['NR.TELEFONICO'],r['NR.CELLULARE']].map(norm).filter(Boolean).forEach(x=>{if(!c.phones.includes(x))c.phones.push(x)});for(const em of splitEmails(r['EMAIL']))if(!c.emails.some(x=>x.toLowerCase()===em))c.emails.push(em);seen.add(id)}project.imports.clientiCount=seen.size}
 function importOrders(rows){const dk=classDescKey(rows);for(const c of Object.values(project.clients)){c.orders=0;c.orderLines=[]}for(const r of rows){const c=ensure(r['CLIENTE'],r['CLIENTE_1']);if(!c)continue;const amount=num(r['IMPORTO INEVASO']);c.name=c.name||norm(r['CLIENTE_1']);c.orders+=amount;c.orderLines.push({order:norm(r['NUM.']),date:excelDate(r['DATA CREAZIONE']),delivery:excelDate(r['DATA CONSEGNA']),year:norm(r['ANNO']),article:norm(r['ARTICOLO']),cls:learnClass(r,dk),description:norm(r['DESCRIZIONE']),qty:num(r['QTA INEVASA']),amount})}}
 function classDescKey(rows){const k=Object.keys(rows[0]||{});const i=k.indexOf('CLASSE 3 ARTICOLO');return i>=0&&k[i+1]?k[i+1]:null}
 // La descrizione dell'agente è la colonna subito dopo AGENTE. Niente ripieghi su altre
@@ -213,16 +352,18 @@ const DAY=86400000;
 
 function monthsSince(t){return t?Math.max(0,Math.round((REF_END-t)/(30.44*DAY))):null}
 
-const APP_VERSION='v14.15';
+const APP_VERSION='v14.16';
 function setVerBadge(txt,cls){const el=$('#verBadge');if(!el)return;el.textContent=txt;el.className='ver'+(cls?' '+cls:'')}
 function showUpdateBanner(){updatePending=true;refreshInstallUI();if($('#updBanner'))return;const d=document.createElement('div');d.id='updBanner';d.className='upd-banner';
  d.innerHTML=`<span>È disponibile una versione più recente di Maps APP.</span><button type="button" id="updNow">Aggiorna ora</button>`;
  document.body.appendChild(d);$('#updNow').onclick=async()=>{const b=$('#updNow');if(b){b.disabled=true;b.textContent='Aggiornamento…'}
+  try{await saveQueue}catch(e){}
+  if(pendingWrites>0)await new Promise(r=>{const t=setInterval(()=>{if(pendingWrites===0){clearInterval(t);r()}},100);setTimeout(()=>{clearInterval(t);r()},5000)});
   try{if('caches'in window){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}
    if('serviceWorker'in navigator){const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs)await r.unregister()}}catch(e){}
   // ricarico su un URL con bypass della cache HTTP, altrimenti il browser rispolvera i file vecchi
   location.replace(location.pathname+'?fresh='+Date.now())};}
-const SW_EXPECTED='maps-app-v14-15-rel';
+const SW_EXPECTED='maps-app-v14-16-rel';
 async function checkVersion(){setVerBadge(APP_VERSION);
  try{const res=await fetch('sw.js?ts='+Date.now(),{cache:'no-store'});const m=/const CACHE='([^']+)'/.exec(await res.text());
   if(m&&m[1]!==SW_EXPECTED){setVerBadge(APP_VERSION+' \u2022 disponibile: '+m[1].replace('maps-app-',''),'stale');showUpdateBanner()}}catch(e){}}
@@ -485,6 +626,7 @@ function renderAgentReview(){const conf=agentConflicts();const pan=$('#agentRevi
  const b=$('#agentReviewShow');if(b)b.classList.toggle('primary',agentReviewOnly)}
 function matchAgentReview(c){return !agentReviewOnly||!!agentConflict(c)}
 async function hardResetApp(){
+ try{await saveQueue}catch(e){}
  if(!confirm('Ripristinare l\u2019app?\n\nVengono svuotate le cache del programma e ricaricata l\u2019ultima versione dal sito. I tuoi dati (clienti, classificazioni, posizioni) NON vengono toccati: restano salvati nel dispositivo.\n\nProcedo?'))return;
  try{if('caches'in window){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}
   if('serviceWorker'in navigator){const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs)await r.unregister()}}catch(e){}
@@ -538,12 +680,78 @@ async function geocodeMissing(){const list=filtered().filter(c=>c.lat==null&&c.a
 function exportProject(){const blob=new Blob([JSON.stringify(project,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`maps-app-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href)}
 function fit(){if(!map)return alert('La mappa richiede una connessione Internet.');const pts=filtered().filter(c=>c.lat!=null).map(c=>[c.lat,c.lng]);if(pts.length)map.fitBounds(pts,{padding:[30,30]})}
 function escapeHtml(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
-$('#excelInput').onchange=e=>importFiles([...e.target.files]);$('#projectInput').onchange=async e=>{try{const p=JSON.parse(await e.target.files[0].text());if(!p.clients)throw 0;
- const n=Object.keys(p.clients).length,cur=Object.keys(project.clients||{}).length;
+$('#excelInput').onchange=e=>importFiles([...e.target.files]);$('#projectInput').onchange=async e=>{
+ const file=e.target.files&&e.target.files[0];
+ e.target.value='';
+ if(!file)return;
+ if(loadFailed){alert('Non posso aprire un progetto: all\u2019avvio non sono riuscito a leggere l\u2019archivio locale.\n\nRicarica la pagina e riprova. Aprendo adesso rischi di perdere i dati gi\u00e0 presenti.');return}
+ // 1) lettura e interpretazione del file: qui gli errori sono colpa del FILE
+ let p;
+ try{
+  const testo=await file.text();
+  p=JSON.parse(testo);
+ }catch(err){alert('File non leggibile: '+(err&&err.message||err)+'\n\nControlla di aver scelto il file .json esportato da Maps APP.');return}
+ let n;
+ try{
+  if(!p||!p.clients||typeof p.clients!=='object')throw new Error('non contiene l\u2019elenco clienti');
+  n=Object.keys(p.clients).length;
+  if(!n)throw new Error('l\u2019elenco clienti \u00e8 vuoto');
+ }catch(err){alert('Progetto non valido: '+err.message+'.');return}
+ const cur=Object.keys(project.clients||{}).length;
  if(p.subset&&cur>n){const chi=[...(p.subset.agents||[]),...(p.subset.regions||[])].join(', ')||'selezione';
-  if(!confirm(`Attenzione: questo \u00e8 un progetto PARZIALE (${n} clienti \u2014 ${chi}).\n\nAprendolo sostituisci il progetto che hai adesso, che ne contiene ${cur}: gli altri ${cur-n} spariscono da questo dispositivo.\n\nSe volevi solo riportare le correzioni dell'agente, annulla e usa "Unisci progetto".\n\nAprire lo stesso?`)){e.target.value='';return}}
- project=p;migrateAgentBase();await save();fit()}catch{alert('Progetto non valido')}finally{e.target.value=''}};$('#exportBtn').onclick=exportProject;
+  if(!confirm(`Attenzione: questo \u00e8 un progetto PARZIALE (${n} clienti \u2014 ${chi}).\n\nAprendolo sostituisci il progetto che hai adesso, che ne contiene ${cur}: gli altri ${cur-n} spariscono da questo dispositivo.\n\nSe volevi solo riportare le correzioni dell'agente, annulla e usa "Unisci progetto".\n\nAprire lo stesso?`))return}
+ // 2) adozione e salvataggio: qui gli errori sono colpa dell'ARCHIVIO, e vanno detti chiaramente
+ const precedente=project;
+ try{
+  adoptProject(p);
+ }catch(err){project=precedente;alert('Progetto non valido: '+(err&&err.message||err));return}
+ try{
+  const salvati=await persistProject(true);
+  project.updatedAt=new Date().toISOString();
+  render();
+  if(map)fit();
+  $('#status').style.color='';$('#status').style.fontWeight='';
+  await requestPersistentStorage();warnIfStorageVolatile();
+  alert(`Progetto aperto e SALVATO su questo dispositivo: ${salvati} clienti.\n\nPuoi chiudere la app: alla riapertura ritrovi tutto.`);
+ }catch(err){
+  console.error(err);
+  render();
+  alert('ATTENZIONE: il progetto \u00e8 aperto sullo schermo ma NON \u00e8 stato salvato su questo dispositivo.\n\nMotivo: '+(err&&err.message||err)+'\n\nSe chiudi la app adesso perdi tutto. Cause tipiche: navigazione privata, spazio esaurito, oppure dati dei siti bloccati nelle impostazioni del browser.');
+ }
+};
+$('#exportBtn').onclick=exportProject;
 $('#resetAppBtn')&&($('#resetAppBtn').onclick=hardResetApp);
+// Diagnostica archivio: serve per capire a distanza perche' un agente "perde tutto".
+async function diagnostica(){
+ const L=[];
+ const std=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+ L.push('Maps APP '+APP_VERSION);
+ L.push('Modo: '+(std?'APP INSTALLATA (dati protetti)':'BROWSER \u2014 i dati possono essere cancellati dal sistema'));
+ L.push('Clienti a schermo: '+Object.keys(project.clients||{}).length);
+ try{
+  const p=await readProject();
+  L.push('Clienti in archivio: '+(p?Object.keys(p.clients||{}).length:'ARCHIVIO VUOTO'));
+  L.push('Ultimo salvataggio: '+((p&&p.updatedAt)?new Date(p.updatedAt).toLocaleString('it-IT'):'mai'));
+ }catch(e){L.push('ARCHIVIO NON LEGGIBILE: '+(e&&e.message||e))}
+ try{const b=await readBackup();L.push('Copia di sicurezza: '+(b?Object.keys(b.clients||{}).length+' clienti':'assente'))}catch(e){L.push('Copia di sicurezza: non leggibile')}
+ try{
+  if(navigator.storage&&navigator.storage.persisted){
+   const per=await navigator.storage.persisted();
+   L.push('Dati protetti dal browser: '+(per?'SI':'NO \u2014 possono sparire'));
+  }else L.push('Dati protetti dal browser: non dichiarato');
+  if(navigator.storage&&navigator.storage.estimate){
+   const e2=await navigator.storage.estimate();
+   L.push('Spazio usato: '+Math.round((e2.usage||0)/1048576)+' MB su '+Math.round((e2.quota||0)/1048576)+' MB');
+  }
+ }catch(e){}
+ L.push('Service worker: '+(('serviceWorker'in navigator)?(navigator.serviceWorker.controller?'attivo':'non ancora attivo'):'non supportato'));
+ L.push('Scritture in corso: '+pendingWrites+(loadFailed?' \u2014 SCRITTURE BLOCCATE (lettura fallita all\u2019avvio)':''));
+ const testo=L.join('\n');
+ if(navigator.clipboard&&navigator.clipboard.writeText){try{await navigator.clipboard.writeText(testo)}catch(e){}}
+ alert(testo+'\n\n(copiato negli appunti: incollalo nel messaggio di segnalazione)');
+}
+$('#diagBtn')&&($('#diagBtn').onclick=diagnostica);
+
 $('#installGuideClose')&&($('#installGuideClose').onclick=()=>$('#installGuide').close());
 $('#prodAdd').onclick=addProd;
 $('#productSearch').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addProd()}});
@@ -593,7 +801,20 @@ $('#installBtn').onclick=async()=>{
   // Nessun prompt disponibile (già installata, oppure Chrome in pausa dopo annullamenti):
   // mostro la guida visiva all'icona nella barra degli indirizzi, che è sempre affidabile.
   if(isIOS())return; showInstallGuide()};
-(async()=>{await load();initMap();render();if('serviceWorker'in navigator){let reloaded=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloaded)return;reloaded=true;location.reload()});}
+// Reload dopo un aggiornamento del service worker.
+// Prima veniva eseguito SEMPRE: alla primissima visita clients.claim() fa scattare
+// controllerchange e la pagina si ricaricava da sola, anche a met\u00e0 di un salvataggio.
+let swReloaded=false,reloadWanted=false;
+function drainReload(){if(reloadWanted&&pendingWrites===0&&!swReloaded){swReloaded=true;location.reload()}}
+function armSwReload(){
+ if(!('serviceWorker'in navigator))return;
+ const avevaController=!!navigator.serviceWorker.controller;
+ navigator.serviceWorker.addEventListener('controllerchange',()=>{
+  if(!avevaController)return;          // prima installazione: nessun reload, non c'\u00e8 niente da aggiornare
+  reloadWanted=true;drainReload()      // aggiornamento vero: ricarico, ma solo a scritture concluse
+ })
+}
+(async()=>{await load();initMap();render();await requestPersistentStorage();warnIfStorageVolatile();armSwReload();
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js?v='+SW_EXPECTED).then(reg=>{setInterval(()=>reg.update().catch(()=>{}),60000);
  reg.addEventListener('updatefound',()=>{const w=reg.installing;if(!w)return;w.addEventListener('statechange',()=>{if(w.state==='installed'&&navigator.serviceWorker.controller)showUpdateBanner()})});
  reg.update().catch(()=>{});setInterval(()=>reg.update().catch(()=>{}),60*60*1000);
